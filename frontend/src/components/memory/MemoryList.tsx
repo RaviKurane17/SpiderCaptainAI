@@ -25,6 +25,7 @@ export interface MemoryRecord {
     privacy: string;
     source: string;
     expires_at: number | null;
+    pinned?: number;
     created_at: number;
     updated_at: number;
 }
@@ -126,6 +127,7 @@ const MemoryCard = ({ memory, onDelete, onPin, onEdit }: { memory: MemoryRecord,
                             )}
                             
                             <div className="ml-auto text-[10px] font-mono uppercase tracking-wider flex items-center gap-1">
+                                {memory.pinned === 1 && <Pin className="w-3 h-3 text-emerald-400 mr-2" />}
                                 {isManual ? <span className="text-emerald-400/80 flex items-center gap-1"><Shield className="w-3 h-3"/> User Defined</span> 
                                           : <span className="text-[var(--cyan)]/80 flex items-center gap-1"><ArrowUpRight className="w-3 h-3"/> AI Extracted</span>}
                             </div>
@@ -139,7 +141,8 @@ const MemoryCard = ({ memory, onDelete, onPin, onEdit }: { memory: MemoryRecord,
                     <Edit2 className="mr-2 w-4 h-4" /> Edit Memory
                 </ContextMenuItem>
                 <ContextMenuItem onClick={onPin} className="text-xs cursor-pointer hover:bg-white/10">
-                    <Pin className="mr-2 w-4 h-4" /> Pin to Working Context
+                    {memory.pinned === 1 ? <PinOff className="mr-2 w-4 h-4" /> : <Pin className="mr-2 w-4 h-4" />}
+                    {memory.pinned === 1 ? "Unpin Memory" : "Pin to Working Context"}
                 </ContextMenuItem>
                 <ContextMenuItem className="text-xs cursor-pointer hover:bg-white/10">
                     <Combine className="mr-2 w-4 h-4" /> Merge with...

@@ -166,6 +166,24 @@ async def ws_handler(websocket, path=None):
             
             if msg_type == "command" and bridge_instance and bridge_instance.on_text_command:
                 text = data.get("text", "")
+                file_data = data.get("file")
+                if file_data:
+                    import os, base64
+                    uploads_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "memory", "uploads"))
+                    os.makedirs(uploads_dir, exist_ok=True)
+                    file_path = os.path.join(uploads_dir, file_data.get("name", "uploaded_file"))
+                    try:
+                        with open(file_path, "wb") as f:
+                            f.write(base64.b64decode(file_data.get("data", "")))
+                        # Ensure the text indicates the file is attached and gives the path to the AI
+                        if not text.startswith("[Attached File:"):
+                            text = f"[Attached File: {file_path}]\n" + text
+                        else:
+                            # Replace just the filename with the full path if the frontend already added it
+                            text = text.replace(f"[Attached File: {file_data.get('name')}]", f"[Attached File: {file_path}]")
+                    except Exception as e:
+                        log.error(f"[WS SERVER] Error saving uploaded file: {e}")
+
                 bridge_instance.on_text_command(text)
                 
             elif msg_type == "mic_toggle" and bridge_instance:
@@ -478,6 +496,19 @@ async def ws_handler(websocket, path=None):
                 except Exception as e:
                     log.error(f"[WS SERVER] Error deleting memory: {e}")
 
+            elif msg_type == "toggle_pin_memory":
+                try:
+                    memory_id = data.get("memory_id")
+                    from core.memory_manager import toggle_pin_memory
+                    res = await asyncio.to_thread(toggle_pin_memory, memory_id)
+                    await websocket.send(json.dumps({
+                        "type": "memory_action_result",
+                        "action": "pin",
+                        "result": res
+                    }))
+                except Exception as e:
+                    log.error(f"[WS SERVER] Error pinning memory: {e}")
+
             elif msg_type == "add_test_memory":
                 try:
                     from core.memory_manager import add_memory
@@ -587,6 +618,11 @@ async def ws_handler(websocket, path=None):
                 try:
                     from core.settings_manager import get_all_settings, get_api_providers_status
                     settings = await asyncio.to_thread(get_all_settings)
+                    
+                    # Mask security hash before sending to UI
+                    if "security_hash" in settings:
+                        settings["security_hash"] = "********" if settings["security_hash"] else ""
+                        
                     api_status = await asyncio.to_thread(get_api_providers_status)
                     await websocket.send(json.dumps({
                         "type": "all_settings_data",
@@ -608,6 +644,26 @@ async def ws_handler(websocket, path=None):
                     }))
                 except Exception as e:
                     log.error(f"[WS SERVER] Error updating setting: {e}")
+
+            elif msg_type == "verify_lock":
+                try:
+                    pin = data.get("pin", "")
+                    from core.settings_manager import get_all_settings
+                    settings = await asyncio.to_thread(get_all_settings)
+                    saved_hash = settings.get("security_hash", "")
+                    
+                    if pin == saved_hash or not saved_hash:
+                        await websocket.send(json.dumps({
+                            "type": "lock_verified",
+                            "success": True
+                        }))
+                    else:
+                        await websocket.send(json.dumps({
+                            "type": "lock_verified",
+                            "success": False
+                        }))
+                except Exception as e:
+                    log.error(f"[WS SERVER] Error verifying lock: {e}")
                     
             elif msg_type == "set_api_key":
                 try:

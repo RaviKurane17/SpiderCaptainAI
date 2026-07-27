@@ -5,17 +5,17 @@ import { Mic, Paperclip, Zap, Send, X } from "lucide-react";
 interface ComposerProps {
     isMuted: boolean;
     onMicToggle: () => void;
-    onSend: (text: string) => void;
+    onSend: (text: string, file?: File) => void;
 }
 
 const Composer = React.memo(function Composer({ isMuted, onMicToggle, onSend }: ComposerProps) {
     const [inputValue, setInputValue] = useState("");
-    const [attachedFile, setAttachedFile] = useState<{ name: string; size: number } | null>(null);
+    const [attachedFile, setAttachedFile] = useState<{ file: File; name: string; size: number } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) setAttachedFile({ name: file.name, size: file.size });
+        if (file) setAttachedFile({ file, name: file.name, size: file.size });
     }, []);
 
     const handlePaperclipClick = useCallback(() => {
@@ -24,10 +24,8 @@ const Composer = React.memo(function Composer({ isMuted, onMicToggle, onSend }: 
 
     const handleSend = useCallback(() => {
         if (!inputValue.trim() && !attachedFile) return;
-        const textToSend = attachedFile
-            ? `[Attached File: ${attachedFile.name}] ${inputValue}`.trim()
-            : inputValue;
-        onSend(textToSend);
+        
+        onSend(inputValue, attachedFile?.file);
         setInputValue("");
         setAttachedFile(null);
     }, [inputValue, attachedFile, onSend]);

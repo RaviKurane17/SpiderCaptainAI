@@ -331,12 +331,16 @@ export const SettingsPanel: React.FC = () => {
                         </Select>
                     </div>
 
-                    <div className="flex items-center justify-between opacity-50 pointer-events-none">
+                    <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
                             <Label className="text-white">Lock on Startup</Label>
                             <p className="text-xs text-muted-foreground">Require PIN when application launches.</p>
                         </div>
-                        <Switch checked={false} />
+                        <Switch 
+                            checked={settings.security_lock_on_startup || false} 
+                            onCheckedChange={v => updateSetting('security_lock_on_startup', v)}
+                            className="data-[state=checked]:bg-rose-500"
+                        />
                     </div>
                 </div>
             </div>

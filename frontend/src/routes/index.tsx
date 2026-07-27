@@ -17,6 +17,8 @@ import CalendarPanel from "../components/CalendarPanel";
 import { AddReminderModal, ViewAllModal } from "../components/ReminderModals";
 import { SetupWizard } from "../components/ui/SetupWizard";
 
+import { LockScreen } from "../components/ui/LockScreen";
+
 // ── Lazily loaded panels (only when user navigates there) ────────────────────
 const ChatPanel     = lazy(() => import("../components/panels/chat_panel").then((m) => ({ default: m.ChatPanel })));
 const CommandsPanel = lazy(() => import("../components/panels/commands_panel").then((m) => ({ default: m.CommandsPanel })));
@@ -58,17 +60,27 @@ function CaptainAI() {
     const [brightness, setBrightness] = useState(100);
     const [isShuttingDown, setIsShuttingDown] = useState(false);
     const [showStartup, setShowStartup] = useState(true);
+    
+    // Lock screen states
+    const [isLocked, setIsLocked] = useState(false);
+    const [lockType, setLockType] = useState("");
 
     React.useEffect(() => {
         if (showStartup) {
+            const audioTimer = setTimeout(() => {
+                const audio = new Audio('/startupvoice.wav');
+                audio.playbackRate = 0.85;
+                audio.play().catch(e => console.log('Audio play failed:', e));
+            }, 1000);
+
             const t = setTimeout(() => {
                 setShowStartup(false);
-                setTimeout(() => {
-                    const audio = new Audio('/startupvoice.wav');
-                    audio.play().catch(e => console.log('Audio play failed:', e));
-                }, 3500);
-            }, 5000);
-            return () => clearTimeout(t);
+            }, 4000);
+
+            return () => {
+                clearTimeout(t);
+                clearTimeout(audioTimer);
+            };
         }
     }, [showStartup]);
 
@@ -84,10 +96,22 @@ function CaptainAI() {
 
     const {
         isConnected, isMuted, isVolumeMuted, aiState, metrics, latency, navigatePage, setNavigatePage, remindersData, logs,
-        wsRef, setLogs, setupComplete,
+        wsRef, setLogs, setupComplete, initialSettings,
         handleSendCommand, handleMicToggle, handleVolumeToggle,
         handleBrightnessToggle: _brightnessWS, handlePowerClick: _powerWS,
     } = useWebSocket();
+
+    // Check lock state when settings are received
+    React.useEffect(() => {
+        if (initialSettings) {
+            if (initialSettings.security_lock_on_startup && 
+                initialSettings.security_lock_type && 
+                initialSettings.security_lock_type !== "No Lock") {
+                setIsLocked(true);
+                setLockType(initialSettings.security_lock_type);
+            }
+        }
+    }, [initialSettings]);
 
     const { tasks, handleAddTask, handleEditTask, handleDeleteTask, handleToggleReminder } = useReminders({ wsRef, setLogs, remindersData, isConnected });
 
@@ -202,6 +226,11 @@ function CaptainAI() {
                     <video src="/startvid.mp4" autoPlay playsInline className="w-full h-full object-cover mix-blend-screen opacity-90" />
                 </div>
             )}
+            
+            {isLocked && !showStartup && (
+                <LockScreen onUnlock={() => setIsLocked(false)} wsRef={wsRef} lockType={lockType} />
+            )}
+
             <div className={gridClass}>
                 {/* ── SIDEBAR ──────────────────────────────────────────── */}
                 <aside className="flex min-h-0 flex-col gap-3">

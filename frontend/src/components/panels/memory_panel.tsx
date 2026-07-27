@@ -46,7 +46,7 @@ export const MemoryPanel: React.FC = () => {
         }
     }, [ws.lastMessage]);
 
-    const handleSearch = (newQuery: string, newCategory: string, newPrivacy: string) => {
+    const handleSearch = React.useCallback((newQuery: string, newCategory: string, newPrivacy: string) => {
         setQuery(newQuery);
         setCategory(newCategory);
         // Note: You can add `privacy: newPrivacy` to state or just send it directly.
@@ -60,7 +60,7 @@ export const MemoryPanel: React.FC = () => {
             limit: 50, 
             offset: 0 
         });
-    };
+    }, [ws.sendCommand]);
 
     const handleDelete = (id: string) => {
         ws.sendCommand({ type: "delete_memory", memory_id: id });

@@ -142,6 +142,26 @@ def get_voice() -> str:
     voice = os.environ.get("CAPTAIN_VOICE", "").strip()
     if voice:
         return voice
+        
+    try:
+        from core.settings_manager import get_all_settings
+        settings = get_all_settings()
+        v = settings.get("voice_personality") or settings.get("voice_selection")
+        if v:
+            # Map friendly names to actual Gemini voices
+            voice_map = {
+                "Jarvis": "Puck",
+                "Friday": "Aoede",
+                "Aoede": "Aoede",
+                "Puck": "Puck",
+                "Charon": "Charon",
+                "Kore": "Kore",
+                "Fenrir": "Fenrir",
+            }
+            return voice_map.get(v, v)
+    except Exception as e:
+        print(f"[Config] Failed to read voice from settings: {e}")
+
     return _read_json_config().get("voice", "Aoede")
 
 

@@ -63,6 +63,10 @@ def init_memory_db():
         cursor.execute("ALTER TABLE memories ADD COLUMN expires_at REAL")
     except sqlite3.OperationalError:
         pass
+    try:
+        cursor.execute("ALTER TABLE memories ADD COLUMN pinned INTEGER DEFAULT 0")
+    except sqlite3.OperationalError:
+        pass
     
     # Optimize search and filtering
     cursor.execute("CREATE INDEX IF NOT EXISTS idx_memories_layer ON memories(layer)")
@@ -137,14 +141,14 @@ def search_memories(query: str = "", category: str = "", privacy: str = "ALL", l
         params.extend([lk, lk, lk])
         
     if category and category.upper() != "ALL":
-        base_sql += " AND category = ?"
+        base_sql += " AND category COLLATE NOCASE = ?"
         params.append(category)
         
     if privacy and privacy.upper() != "ALL":
-        base_sql += " AND privacy = ?"
+        base_sql += " AND privacy COLLATE NOCASE = ?"
         params.append(privacy)
         
-    base_sql += " ORDER BY updated_at DESC LIMIT ? OFFSET ?"
+    base_sql += " ORDER BY pinned DESC, updated_at DESC LIMIT ? OFFSET ?"
     params.extend([limit, offset])
     
     cursor.execute(base_sql, params)
@@ -193,6 +197,13 @@ def get_memory_stats():
     cursor.execute("SELECT COUNT(*) as count FROM memories WHERE updated_at >= ?", (now - 86400,)) # Last 24h
     recent_count = cursor.fetchone()['count']
     
+    # 6. Pinned
+    try:
+        cursor.execute("SELECT COUNT(*) as count FROM memories WHERE pinned = 1")
+        pinned_count = cursor.fetchone()['count']
+    except sqlite3.OperationalError:
+        pinned_count = 0
+    
     # Categories
     cursor.execute("SELECT category, COUNT(*) as count FROM memories GROUP BY category")
     categories = {row['category']: row['count'] for row in cursor.fetchall()}
@@ -212,7 +223,7 @@ def get_memory_stats():
         "conversation_memories": session_count,
         "personal_memories": personal_count,
         "recent_memories": recent_count,
-        "pinned_memories": 0, # Placeholder for pin system
+        "pinned_memories": pinned_count,
         "favourite_memories": 0, # Placeholder for favourites
         "db_size_bytes": db_size,
         "categories": categories,
@@ -229,6 +240,24 @@ def delete_memory(memory_id: str):
     cursor.execute("DELETE FROM embeddings WHERE memory_id = ?", (memory_id,))
     conn.commit()
     return {"success": True}
+
+def toggle_pin_memory(memory_id: str):
+    conn = get_db_conn()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT pinned FROM memories WHERE id = ?", (memory_id,))
+        row = cursor.fetchone()
+        if row is None:
+            return {"success": False, "error": "Memory not found"}
+        
+        current_pin = row['pinned'] if 'pinned' in row.keys() else 0
+        new_pin = 1 if not current_pin else 0
+        
+        cursor.execute("UPDATE memories SET pinned = ? WHERE id = ?", (new_pin, memory_id))
+        conn.commit()
+        return {"success": True, "pinned": new_pin}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 # Initialize on import
 init_memory_db()

@@ -46,3 +46,9 @@ dist/
 .tanstack/
 .wrangler/
 
+*.log
+memory/*.db*
+memory/reminders.json
+config/settings.json
+mydata.txt
+memory/uploads/

@@ -69,8 +69,9 @@ def build_config(resumption_handle: str | None = None) -> 'types.LiveConnectConf
     time_str = now.strftime("%A, %B %d, %Y — %I:%M %p")
     time_ctx = (
         f"[CURRENT DATE & TIME]\n"
-        f"Right now it is: {time_str}\n"
-        f"Use this to calculate exact times for reminders.\n\n"
+        f"Right now it is: {time_str} (India Standard Time - IST)\n"
+        f"Use this to calculate exact times for reminders.\n"
+        f"CRITICAL RULE: When asked about the time, ALWAYS reply with the time in India (IST).\n\n"
     )
 
     parts = [time_ctx]

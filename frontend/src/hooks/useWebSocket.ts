@@ -45,6 +45,7 @@ export function useWebSocket() {
     const [logs,         setLogs]         = useState<LogRow[]>([]);
     const [lastMessage,  setLastMessage]  = useState<any>(null);
     const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
+    const [initialSettings, setInitialSettings] = useState<any>(null);
     const wsRef = useRef<WebSocket | null>(null);
 
     // When the frontend sends a command, we lock state to THINKING until
@@ -164,8 +165,13 @@ export function useWebSocket() {
                             done: who === "CAPTAIN" && (entry.text as string).includes("Done"),
                         });
                     } else if (type === "all_settings_data") {
-                        if (data.settings && data.settings.setup_complete !== undefined) {
-                            setSetupComplete(data.settings.setup_complete);
+                        if (data.settings) {
+                            setInitialSettings(data.settings);
+                            if (data.settings.setup_complete !== undefined) {
+                                setSetupComplete(data.settings.setup_complete);
+                            } else {
+                                setSetupComplete(true);
+                            }
                         } else {
                             setSetupComplete(true); // Fallback if missing
                         }
@@ -216,35 +222,54 @@ export function useWebSocket() {
     }, []);
 
     const handleSendCommand = useCallback(
-        (text: string) => {
-            if (!text.trim()) return;
-            sendCommand({ type: "command", text });
+        (text: string, file?: File) => {
+            if (!text.trim() && !file) return;
 
-            // Add the "YOU" row immediately (optimistic) — backend will NOT echo it back.
-            const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-            appendLog({
-                who: "YOU", icon: User, color: "text-[var(--cyan)]",
-                text, time: now,
-            });
-
-            // Lock state to THINKING — block any spurious LISTENING from
-            // WS reconnect handshake until we get SPEAKING or LISTENING
-            // from the actual Gemini response.
-            awaitingResponseRef.current = true;
-            setAiState("THINKING");
-
-            // Safety-net: if the backend never sends a state transition, reset
-            // back to LISTENING after the timeout so the UI doesn't stay frozen.
-            if (thinkingTimeoutRef.current !== null) {
-                clearTimeout(thinkingTimeoutRef.current);
-            }
-            thinkingTimeoutRef.current = setTimeout(() => {
-                if (awaitingResponseRef.current) {
-                    awaitingResponseRef.current = false;
-                    thinkingTimeoutRef.current = null;
-                    setAiState("LISTENING");
+            const sendWithFile = (base64Data?: string) => {
+                const payload: any = { type: "command", text };
+                if (file && base64Data) {
+                    payload.file = {
+                        name: file.name,
+                        data: base64Data.split(',')[1] // remove data URI prefix
+                    };
                 }
-            }, THINKING_TIMEOUT_MS);
+                sendCommand(payload);
+
+                // Add the "YOU" row immediately (optimistic) — backend will NOT echo it back.
+                const now = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+                const displayMsg = file ? `[Attached File: ${file.name}] ${text}`.trim() : text;
+                appendLog({
+                    who: "YOU", icon: User, color: "text-[var(--cyan)]",
+                    text: displayMsg, time: now,
+                });
+
+                // Lock state to THINKING — block any spurious LISTENING from
+                // WS reconnect handshake until we get SPEAKING or LISTENING
+                // from the actual Gemini response.
+                awaitingResponseRef.current = true;
+                setAiState("THINKING");
+
+                // Safety-net: if the backend never sends a state transition, reset
+                // back to LISTENING after the timeout so the UI doesn't stay frozen.
+                if (thinkingTimeoutRef.current !== null) {
+                    clearTimeout(thinkingTimeoutRef.current);
+                }
+                thinkingTimeoutRef.current = setTimeout(() => {
+                    if (awaitingResponseRef.current) {
+                        awaitingResponseRef.current = false;
+                        thinkingTimeoutRef.current = null;
+                        setAiState("LISTENING");
+                    }
+                }, THINKING_TIMEOUT_MS);
+            };
+
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = () => sendWithFile(reader.result as string);
+                reader.readAsDataURL(file);
+            } else {
+                sendWithFile();
+            }
         },
         [sendCommand, appendLog]
     );
@@ -268,7 +293,7 @@ export function useWebSocket() {
     }, [sendCommand]);
 
     return {
-        isConnected, isMuted, isVolumeMuted, aiState, metrics, latency, navigatePage, remindersData, logs, lastMessage, setupComplete,
+        isConnected, isMuted, isVolumeMuted, aiState, metrics, latency, navigatePage, remindersData, logs, lastMessage, setupComplete, initialSettings,
         wsRef, sendCommand, setNavigatePage,
         // expose appendLog as setLogs replacement for useReminders
         setLogs: useCallback(
