@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+*.egg
+dist/
+build/
+*.spec
+
+# Secrets & User Data
+.env
+config/api_keys.json
+config/auth.json
+config/faces/
+*firebase*adminsdk*.json
+
+# Memory / Vector DB
+memory/long_term.json
+memory/vector_db/
+memory/analytics.json
+
+# Logs
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Backups
+*_backup.py
+*_old.py
+
+# Node.js
+node_modules/
+dist/
+.env.local
+.env.*.local
+.nitro/
+.output/
+.tanstack/
+.wrangler/
+

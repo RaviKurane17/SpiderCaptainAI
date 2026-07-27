@@ -1,0 +1,79 @@
+[
+  {
+    "icon": "\ud83d\udcc5",
+    "title": "College Class",
+    "desc": "DBMS Lecture",
+    "time": "09:00 AM\nTomorrow",
+    "color": "#00d4ff"
+  },
+  {
+    "icon": "\ud83d\uddd3",
+    "title": "Project Meeting",
+    "desc": "AI Assistant Module Discussion",
+    "time": "11:30 AM\nTomorrow",
+    "color": "#bf00ff"
+  },
+  {
+    "icon": "\u2328",
+    "title": "Coding Time",
+    "desc": "Work on Spring Boot API",
+    "time": "07:00 PM\nToday",
+    "color": "#00ff00"
+  },
+  {
+    "icon": "\ud83d\udccb",
+    "title": "Submit Assignment",
+    "desc": "CN Assignment Submission",
+    "time": "11:59 PM\n23 Jul 2026",
+    "color": "#ffa500"
+  },
+  {
+    "icon": "\ud83d\udcc5",
+    "title": "hello",
+    "desc": "going gym",
+    "time": "5:00 pm today",
+    "color": "#00d4ff"
+  },
+  {
+    "icon": "\ud83d\udcc5",
+    "title": "gym",
+    "desc": "gym jana hai",
+    "time": "11 pm today",
+    "color": "#00d4ff"
+  },
+  {
+    "icon": "\ud83d\udcc5",
+    "title": "Complete Coding",
+    "desc": "Finish the task",
+    "time": "In 10 minutes",
+    "color": "#00d4ff"
+  },
+  {
+    "icon": "\ud83d\udcc5",
+    "title": "Bus to Gaon (Hasoor Champu)",
+    "desc": "",
+    "time": "10:50 AM\\nTomorrow",
+    "color": "#00d4ff"
+  },
+  {
+    "icon": "\ud83d\udcc5",
+    "title": "\u0917\u093e\u0902\u0935 \u091c\u093e\u0928\u093e \u0939\u0948",
+    "desc": "",
+    "time": "06:00 PM\\nToday",
+    "color": "#00d4ff"
+  },
+  {
+    "icon": "\ud83d\udcc5",
+    "title": "\u0917\u093e\u0902\u0935 \u091c\u093e\u0928\u093e \u0939\u0948",
+    "desc": "",
+    "time": "04:30 PM\\nToday",
+    "color": "#00d4ff"
+  },
+  {
+    "icon": "\ud83d\udcc5",
+    "title": "\u0917\u093e\u0902\u0935 \u091c\u093e\u0928\u0947 \u0915\u0940 \u0924\u0948\u092f\u093e\u0930\u0940 (15 min beforehand)",
+    "desc": "",
+    "time": "04:15 PM\\nToday",
+    "color": "#00d4ff"
+  }
+]
