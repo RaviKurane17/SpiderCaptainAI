@@ -26,16 +26,19 @@ def init_environment():
 def run_app():
     """Main entry point."""
     multiprocessing.freeze_support()
-    init_environment()
-    
+
+    # ── Orb mode: MUST be checked before init_environment() ───────────────
+    # init_environment() redirects sys.stdout to a log file, which would
+    # break the stdout pipe used by the parent process to detect RESTORE signal.
     if len(sys.argv) > 1 and sys.argv[1] == '--orb':
-        # Launched by captain_app to show the orb window (frozen exe mode)
         from PyQt6.QtWidgets import QApplication
         from core.orb import OrbWindow
         app = QApplication(sys.argv)
         orb = OrbWindow()
         orb.show()
         sys.exit(app.exec())
+
+    init_environment()
 
     if len(sys.argv) > 1 and sys.argv[1].endswith('.py'):
         try:

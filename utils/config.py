@@ -24,10 +24,18 @@ def get_base_dir() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-BASE_DIR        = get_base_dir()
+def get_assets_dir() -> Path:
+    """In frozen builds, bundled files live in _MEIPASS. In dev, same as BASE_DIR."""
+    if getattr(sys, "frozen", False):
+        return Path(sys._MEIPASS)  # type: ignore[attr-defined]
+    return Path(__file__).resolve().parent.parent
+
+
+BASE_DIR        = get_base_dir()          # runtime writable dir (config, memory, .env)
+ASSETS_DIR      = get_assets_dir()        # bundled read-only assets (_internal in exe)
 CONFIG_DIR      = BASE_DIR / "config"
 API_CONFIG_PATH = CONFIG_DIR / "api_keys.json"
-PROMPT_PATH     = BASE_DIR / "core" / "prompt.txt"
+PROMPT_PATH     = ASSETS_DIR / "core" / "prompt.txt"   # bundled asset → use ASSETS_DIR
 MEMORY_DIR      = BASE_DIR / "memory"
 LOGS_DIR        = BASE_DIR / "logs"
 
