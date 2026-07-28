@@ -404,9 +404,33 @@ class CaptainLive:
                                         })
 
                                     try:
+                                        # Per-tool timeout policy
+                                        _TOOL_TIMEOUTS = {
+                                            "file_controller": 60.0,
+                                            "screen_process": 15.0,
+                                            "weather_report": 10.0,
+                                            "web_search": 20.0,
+                                            "phone_agent": 15.0,
+                                            "dev_agent": 45.0,
+                                            "code_helper": 30.0,
+                                            "open_app": 10.0,
+                                            "computer_settings": 5.0,
+                                            "computer_control": 10.0,
+                                            "desktop_control": 5.0,
+                                            "reminder": 5.0,
+                                            "youtube_video": 15.0,
+                                            "send_message": 10.0,
+                                            "save_memory": 5.0,
+                                            "search_memory": 10.0,
+                                            "file_processor": 30.0,
+                                            "agent_task": 45.0,
+                                            "shutdown_captain": 5.0,
+                                        }
+                                        tool_timeout = _TOOL_TIMEOUTS.get(fc_name, 18.0)
+                                        
                                         fr = await asyncio.wait_for(
                                             execute_tool(fc, self.ui, self.speak, self.speak_error, self.perf_state),
-                                            timeout=18.0
+                                            timeout=tool_timeout
                                         )
                                         fn_responses.append(fr)
                                         

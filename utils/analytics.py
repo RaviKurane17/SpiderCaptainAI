@@ -3,12 +3,16 @@ Captain AI — Usage Analytics
 ==============================
 Tracks tool usage, session duration, and command history.
 Persists to memory/analytics.json for the Overview dashboard.
+
+Writes are batched via an in-memory queue and flushed periodically
+or on shutdown — never blocks the event loop.
 """
 
 import json
 import time
 import threading
 from datetime import datetime
+from collections import deque
 
 from utils.config import MEMORY_DIR
 
@@ -16,8 +20,14 @@ from utils.config import MEMORY_DIR
 ANALYTICS_PATH = MEMORY_DIR / "analytics.json"
 _lock = threading.RLock()
 _analytics_cache = None
-_write_counter = 0
-_WRITE_INTERVAL = 5   # flush to disk every N track_tool() calls
+
+# ── Batch Write Queue ──────────────────────────────────────────────────────
+_write_queue: deque = deque()
+_flush_interval = 10  # seconds
+_flush_thread: threading.Thread | None = None
+_flush_stop = threading.Event()
+_write_counter = 0  # kept for maintenance daemon compatibility
+
 
 def _load() -> dict:
     """Load analytics data from cache or disk."""
@@ -61,27 +71,51 @@ def _save(data: dict) -> None:
             print(f"[Analytics] Save error: {e}")
 
 
-def track_tool(tool_name: str) -> None:
-    """Record a tool invocation. Batches disk writes every _WRITE_INTERVAL calls."""
-    global _write_counter
+def _flush_loop():
+    """Background thread that processes the write queue in batches."""
+    while not _flush_stop.wait(_flush_interval):
+        _flush_pending()
+
+
+def _flush_pending():
+    """Process all pending write events in a single batch."""
+    if not _write_queue:
+        return
     with _lock:
         data = _load()
-        data["total_commands"] = data.get("total_commands", 0) + 1
+        while _write_queue:
+            tool_name = _write_queue.popleft()
+            data["total_commands"] = data.get("total_commands", 0) + 1
 
-        tools = data.get("tool_usage", {})
-        tools[tool_name] = tools.get(tool_name, 0) + 1
-        data["tool_usage"] = tools
+            tools = data.get("tool_usage", {})
+            tools[tool_name] = tools.get(tool_name, 0) + 1
+            data["tool_usage"] = tools
 
-        today = datetime.now().strftime("%Y-%m-%d")
-        daily = data.get("daily_commands", {})
-        daily[today] = daily.get(today, 0) + 1
-        data["daily_commands"] = daily
+            today = datetime.now().strftime("%Y-%m-%d")
+            daily = data.get("daily_commands", {})
+            daily[today] = daily.get(today, 0) + 1
+            data["daily_commands"] = daily
 
-        _analytics_cache = data   # always update in-memory cache
-        _write_counter += 1
-        if _write_counter >= _WRITE_INTERVAL:
-            _write_counter = 0
-            _save(data)
+        _save(data)
+
+
+def _ensure_flush_thread():
+    """Start the background flush thread if not already running."""
+    global _flush_thread
+    if _flush_thread is None or not _flush_thread.is_alive():
+        _flush_stop.clear()
+        _flush_thread = threading.Thread(target=_flush_loop, daemon=True,
+                                          name="AnalyticsFlush")
+        _flush_thread.start()
+
+
+def track_tool(tool_name: str) -> None:
+    """
+    Record a tool invocation. Queues the write — never blocks.
+    The background flush thread batches them into a single SQLite transaction.
+    """
+    _write_queue.append(tool_name)
+    _ensure_flush_thread()
 
 
 def start_session() -> None:
@@ -91,10 +125,13 @@ def start_session() -> None:
         data["total_sessions"] = data.get("total_sessions", 0) + 1
         data["session_start"] = time.time()
         _save(data)
+    _ensure_flush_thread()
 
 
 def end_session() -> None:
     """Mark the end of the current session and flush any pending writes."""
+    _flush_stop.set()
+    _flush_pending()  # flush remaining items synchronously
     with _lock:
         data = _load()
         start = data.get("session_start")
@@ -119,7 +156,7 @@ def get_stats() -> dict:
     hours = int(total_sec // 3600)
     minutes = int((total_sec % 3600) // 60)
 
-    # Top 5 most used tools
+    # Top 8 most used tools
     tools = data.get("tool_usage", {})
     top_tools = sorted(tools.items(), key=lambda x: x[1], reverse=True)[:8]
 

@@ -18,6 +18,7 @@ import { AddReminderModal, ViewAllModal } from "../components/ReminderModals";
 import { SetupWizard } from "../components/ui/SetupWizard";
 import { LockScreen } from "../components/ui/LockScreen";
 import { DeveloperDiagnostics } from "../components/DeveloperDiagnostics";
+import { StartupBanner } from "../components/StartupBanner";
 
 // ── Lazily loaded panels (only when user navigates there) ────────────────────
 const ChatPanel     = lazy(() => import("../components/panels/chat_panel").then((m) => ({ default: m.ChatPanel })));
@@ -110,7 +111,7 @@ function CaptainAI() {
     const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
 
     const {
-        isConnected, isMuted, isVolumeMuted, aiState, metrics, latency, navigatePage, setNavigatePage, remindersData, logs, diagnostics,
+        isConnected, isMuted, isVolumeMuted, aiState, metrics, latency, navigatePage, setNavigatePage, remindersData, logs, diagnostics, startupState,
         wsRef, setLogs, setupComplete, initialSettings,
         handleSendCommand, handleMicToggle, handleVolumeToggle,
         handleBrightnessToggle: _brightnessWS, handlePowerClick: _powerWS,
@@ -384,6 +385,8 @@ function CaptainAI() {
             )}
 
             {/* ── OVERLAYS ─────────────────────────────────────────────── */}
+            <StartupBanner state={startupState} />
+
             {showDiagnostics && (
                 <DeveloperDiagnostics 
                     data={diagnostics} 

@@ -24,12 +24,14 @@ async def handle_save_memory(fc, args, memory_fn):
     )
 
 
-async def _run_sync(loop, fn):
-    """Run a blocking function in the default executor."""
-    return await loop.run_in_executor(None, fn)
+async def _run_sync(loop, fn, pool=None):
+    """Run a blocking function in the specific executor pool."""
+    from utils.concurrency import get_fast_pool
+    pool = pool or get_fast_pool()
+    return await loop.run_in_executor(pool, fn)
 
 
-async def _background_tool(name, fn, speak_cb):
+async def _background_tool(name, fn, speak_cb, pool=None):
     """Fire a function in a background thread and return an immediate ack."""
     def _run():
         try:
@@ -38,7 +40,10 @@ async def _background_tool(name, fn, speak_cb):
                 speak_cb(f"[System: {name} finished] {res}")
         except Exception as exc:
             log.error(f"[{name}] background error: {exc}")
-    run_in_background(_run)
+    
+    from utils.concurrency import get_fast_pool
+    pool = pool or get_fast_pool()
+    run_in_background(_run, pool=pool)
     return f"{name} started in background. I will notify you when done."
 
 
@@ -51,41 +56,46 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
     loop = asyncio.get_event_loop()
     result = "Done."
 
+    from utils.concurrency import get_fast_pool, get_io_pool, get_network_pool
+    fast_pool = get_fast_pool()
+    io_pool = get_io_pool()
+    net_pool = get_network_pool()
+
     try:
         if name == "open_app":
             from actions.open_app import open_app
-            r = await _run_sync(loop, lambda: open_app(parameters=args, response=None, player=ui))
+            r = await _run_sync(loop, lambda: open_app(parameters=args, response=None, player=ui), pool=fast_pool)
             result = r or f"Opened {args.get('app_name')}."
 
         elif name == "weather_report":
             from actions.weather_report import weather_action
-            r = await _run_sync(loop, lambda: weather_action(parameters=args, player=ui))
+            r = await _run_sync(loop, lambda: weather_action(parameters=args, player=ui), pool=net_pool)
             result = r or "Weather delivered."
 
 
         elif name == "file_controller":
             from actions.file_controller import file_controller
-            r = await _run_sync(loop, lambda: file_controller(parameters=args, player=ui))
+            r = await _run_sync(loop, lambda: file_controller(parameters=args, player=ui), pool=io_pool)
             result = r or "Done."
 
         elif name == "phone_agent":
             from actions.phone_agent import phone_agent
-            r = await _run_sync(loop, lambda: phone_agent(parameters=args, player=ui))
+            r = await _run_sync(loop, lambda: phone_agent(parameters=args, player=ui), pool=net_pool)
             result = r or "Done."
 
         elif name == "send_message":
             from actions.send_message import send_message
-            r = await _run_sync(loop, lambda: send_message(parameters=args, response=None, player=ui, session_memory=None))
+            r = await _run_sync(loop, lambda: send_message(parameters=args, response=None, player=ui, session_memory=None), pool=fast_pool)
             result = r or f"Message sent to {args.get('receiver')}."
 
         elif name == "reminder":
             from actions.reminder import reminder
-            r = await _run_sync(loop, lambda: reminder(parameters=args, response=None, player=ui))
+            r = await _run_sync(loop, lambda: reminder(parameters=args, response=None, player=ui), pool=fast_pool)
             result = r or "Reminder set."
 
         elif name == "youtube_video":
             from actions.youtube_video import youtube_video
-            r = await _run_sync(loop, lambda: youtube_video(parameters=args, response=None, player=ui))
+            r = await _run_sync(loop, lambda: youtube_video(parameters=args, response=None, player=ui), pool=net_pool)
             result = r or "Done."
 
         elif name == "screen_process":
@@ -93,18 +103,19 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
             run_in_background(
                 screen_process,
                 parameters=args, response=None,
-                player=ui, session_memory=None
+                player=ui, session_memory=None,
+                pool=io_pool
             )
             result = "Vision module activated. Stay completely silent — vision module will speak directly."
 
         elif name == "computer_settings":
             from actions.computer_settings import computer_settings
-            r = await _run_sync(loop, lambda: computer_settings(parameters=args, response=None, player=ui))
+            r = await _run_sync(loop, lambda: computer_settings(parameters=args, response=None, player=ui), pool=fast_pool)
             result = r or "Done."
 
         elif name == "desktop_control":
             from actions.desktop import desktop_control
-            r = await _run_sync(loop, lambda: desktop_control(parameters=args, player=ui))
+            r = await _run_sync(loop, lambda: desktop_control(parameters=args, player=ui), pool=fast_pool)
             result = r or "Done."
 
         elif name == "code_helper":
@@ -114,10 +125,11 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
                 result = await _background_tool(
                     "Code task",
                     lambda: code_helper(parameters=args, player=ui, speak=speak_callback),
-                    speak_callback
+                    speak_callback,
+                    pool=io_pool
                 )
             else:
-                r = await _run_sync(loop, lambda: code_helper(parameters=args, player=ui, speak=speak_callback))
+                r = await _run_sync(loop, lambda: code_helper(parameters=args, player=ui, speak=speak_callback), pool=io_pool)
                 result = r or "Done."
 
         elif name == "dev_agent":
@@ -125,7 +137,8 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
             result = await _background_tool(
                 "Development task",
                 lambda: dev_agent(parameters=args, player=ui, speak=speak_callback),
-                speak_callback
+                speak_callback,
+                pool=io_pool
             )
 
         elif name == "agent_task":
@@ -137,7 +150,7 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
 
         elif name == "web_search":
             from actions.web_search import web_search as web_search_action
-            r = await _run_sync(loop, lambda: web_search_action(parameters=args, player=ui))
+            r = await _run_sync(loop, lambda: web_search_action(parameters=args, player=ui), pool=net_pool)
             result = r or "Done."
 
         elif name == "file_processor":
@@ -147,12 +160,13 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
             result = await _background_tool(
                 "File processing",
                 lambda: file_processor(parameters=args, player=ui, speak=speak_callback),
-                speak_callback
+                speak_callback,
+                pool=io_pool
             )
 
         elif name == "computer_control":
             from actions.computer_control import computer_control
-            r = await _run_sync(loop, lambda: computer_control(parameters=args, player=ui))
+            r = await _run_sync(loop, lambda: computer_control(parameters=args, player=ui), pool=fast_pool)
             result = r or "Done."
 
         elif name == "shutdown_captain":
@@ -164,7 +178,7 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
                 import time, os
                 time.sleep(1.5)
                 os._exit(0)
-            run_in_background(_shutdown)
+            run_in_background(_shutdown, pool=fast_pool)
 
         elif name == "search_memory":
             from core import memory_manager
@@ -177,7 +191,7 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
                 for r in rows:
                     resp += f"- {r.get('title', 'Fact')}: {r.get('summary', '')}\n"
                 return resp
-            r = await _run_sync(loop, _do_search)
+            r = await _run_sync(loop, _do_search, pool=io_pool)
             result = r or "Done."
 
         else:
@@ -185,7 +199,7 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
             from core.tool_dispatcher import _PLUGIN_HANDLERS
             handler = _PLUGIN_HANDLERS.get(name)
             if handler:
-                r = await _run_sync(loop, lambda: handler(parameters=args, player=ui))
+                r = await _run_sync(loop, lambda: handler(parameters=args, player=ui), pool=io_pool)
                 result = r or "Done."
             else:
                 result = f"Unknown tool: {name}"

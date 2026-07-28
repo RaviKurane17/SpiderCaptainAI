@@ -81,6 +81,27 @@ _IMG_MAX_W = 640
 _IMG_MAX_H = 360
 _JPEG_Q    = 60
 
+# ── Frame-difference detection ────────────────────────────────────────────
+# Store a hash of the last screenshot. If screen hasn't changed, skip upload.
+_last_frame_hash: int | None = None
+
+
+def _get_adaptive_settings() -> dict:
+    """
+    Read quality settings from the active Configuration Profile.
+    Falls back to balanced defaults if profiles are unavailable.
+    """
+    try:
+        from core.profiles import get_setting
+        return {
+            "max_width":  get_setting("screenshot_max_width") or 640,
+            "quality":    get_setting("screenshot_quality") or 70,
+            "fmt":        get_setting("screenshot_format") or "JPEG",
+        }
+    except Exception:
+        return {"max_width": 640, "quality": 70, "fmt": "JPEG"}
+
+
 _SYSTEM_PROMPT = (
     "You are CAPTAIN, an advanced AI assistant. "
     "Analyze the provided image with precision and intelligence. "
@@ -96,25 +117,53 @@ def _compress(img_bytes: bytes, source_format: str = "PNG") -> tuple[bytes, str]
         return img_bytes, f"image/{source_format.lower()}"
 
     try:
+        cfg = _get_adaptive_settings()
+        max_w = cfg["max_width"]
+        max_h = int(max_w * 0.5625)  # maintain 16:9
+        quality = cfg["quality"]
+        out_fmt = cfg["fmt"]
+
         img = PIL.Image.open(io.BytesIO(img_bytes)).convert("RGB")
-        img.thumbnail((_IMG_MAX_W, _IMG_MAX_H), PIL.Image.BILINEAR)
+        img.thumbnail((max_w, max_h), PIL.Image.BILINEAR)
         buf = io.BytesIO()
-        img.save(buf, format="JPEG", quality=_JPEG_Q, optimize=False)
-        return buf.getvalue(), "image/jpeg"
+        if out_fmt == "PNG":
+            img.save(buf, format="PNG", optimize=True)
+            return buf.getvalue(), "image/png"
+        else:
+            img.save(buf, format="JPEG", quality=quality, optimize=False)
+            return buf.getvalue(), "image/jpeg"
     except Exception as e:
         print(f"[Vision] ⚠️  Image compress failed: {e}")
         return img_bytes, f"image/{source_format.lower()}"
 
-def _capture_screen() -> tuple[bytes, str]:
+def _capture_screen(force: bool = False) -> tuple[bytes, str] | None:
+    """
+    Capture the primary screen. Implements frame-difference detection:
+    if the screen hasn't visually changed since last capture, returns None
+    to signal the caller to skip re-encoding and re-uploading.
+    """
+    global _last_frame_hash
 
     if not _MSS:
         raise RuntimeError("mss is not installed. Run: pip install mss")
 
     with mss.mss() as sct:
-        monitors = sct.monitors          # [0] = all combined, [1..n] = real screens
+        monitors = sct.monitors
         target   = monitors[1] if len(monitors) > 1 else monitors[0]
         shot     = sct.grab(target)
         png      = mss.tools.to_png(shot.rgb, shot.size)
+
+    # ── Frame-difference check ────────────────────────────────────────
+    # Compute a lightweight perceptual hash of a tiny thumbnail
+    if _PIL:
+        try:
+            img = PIL.Image.open(io.BytesIO(png)).convert("L").resize((16, 9))
+            frame_hash = hash(img.tobytes())
+            if not force and frame_hash == _last_frame_hash:
+                return None   # Screen unchanged — skip upload
+            _last_frame_hash = frame_hash
+        except Exception:
+            pass
 
     return _compress(png, "PNG")
 

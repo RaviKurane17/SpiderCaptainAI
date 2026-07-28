@@ -45,6 +45,7 @@ export function useWebSocket() {
     const [remindersData,setRemindersData]= useState<any[] | null>(null);
     const [logs,         setLogs]         = useState<LogRow[]>([]);
     const [diagnostics,  setDiagnostics]  = useState<any>(null);
+    const [startupState, setStartupState] = useState<string>("STARTING");
     const [lastMessage,  setLastMessage]  = useState<any>(null);
     const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
     const [initialSettings, setInitialSettings] = useState<any>(null);
@@ -152,7 +153,9 @@ export function useWebSocket() {
                         setIsVolumeMuted(data.muted);
                     } else if (type === "diagnostics_update") {
                         setDiagnostics(data.data);
-                    } else if (type === "log") {
+                    } else if (type === "startup_state") {
+                        setStartupState(data.state);
+                    } else if (type === "notification") {
                         const entry = data.log;
                         if (!entry) return;
                         const who: string = entry.who;
@@ -306,7 +309,7 @@ export function useWebSocket() {
     }, [sendCommand]);
 
     return {
-        isConnected, isMuted, isVolumeMuted, aiState, metrics, latency, navigatePage, remindersData, logs, diagnostics, lastMessage, setupComplete, initialSettings,
+        isConnected, isMuted, isVolumeMuted, aiState, metrics, latency, navigatePage, remindersData, logs, diagnostics, startupState, lastMessage, setupComplete, initialSettings,
         wsRef, sendCommand, setNavigatePage,
         // expose appendLog as setLogs replacement for useReminders
         setLogs: useCallback(
