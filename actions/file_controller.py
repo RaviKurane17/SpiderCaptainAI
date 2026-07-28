@@ -561,6 +561,9 @@ def file_controller(
         elif action == "organize_desktop":
             return organize_desktop()
 
+        elif action == "benchmark":
+            return _smart_benchmark(params, player)
+
         elif action == "info":
             return get_file_info(path, name=name)
 
@@ -572,6 +575,15 @@ def file_controller(
 
 
 # ── New Search/Open Helpers (delegate to FileSearchEngine) ─────────────────
+
+def _smart_benchmark(params: dict, player=None) -> str:
+    from actions.files.engine import get_engine
+    query = params.get("name", "") or params.get("query", "")
+    if not query:
+        return "Please specify a query to benchmark."
+        
+    engine = get_engine()
+    return engine.benchmark_providers(query)
 
 def _smart_search(params: dict, player=None) -> str:
     """
@@ -590,23 +602,53 @@ def _smart_search(params: dict, player=None) -> str:
     if path and len(path) <= 3 and path[0].isalpha():
         drive = path[0].upper()
 
+    ui = getattr(player, "ui", player) if player else None
+    
     progress_msgs = []
     def on_progress(msg: str):
         progress_msgs.append(msg)
         if player:
             player.write_log(f"[search] {msg}")
 
+    accumulated_results = []
+    def on_partial(batch: list):
+        accumulated_results.extend(batch)
+        if ui and hasattr(ui, "broadcast"):
+            ui.broadcast({
+                "type": "chat_search_results",
+                "query": query,
+                "results": accumulated_results
+            })
+            
+    def on_diagnostics(diag_data: dict):
+        if ui and hasattr(ui, "broadcast"):
+            ui.broadcast({
+                "type": "diagnostics_update",
+                "data": diag_data
+            })
+            
+    def on_complete(result: dict):
+        if ui and hasattr(ui, "broadcast") and result.get("status") == "multiple":
+            ui.broadcast({
+                "type": "chat_search_results",
+                "query": query,
+                "results": result.get("results", [])
+            })
+
     engine = get_engine()
-    result = engine.search(
+    engine.search_async(
         query=query,
         drive=drive,
         search_type=search_type,
         extension=extension,
         on_progress=on_progress,
+        on_partial=on_partial,
+        on_diagnostics=on_diagnostics,
+        on_complete=on_complete,
         max_results=30,
     )
 
-    return result["message"]
+    return f"Initiated search for '{query}'. Results will stream into the UI shortly."
 
 
 def _smart_open(params: dict, player=None, force_folder: bool = False) -> str:
@@ -647,6 +689,8 @@ def _smart_open(params: dict, player=None, force_folder: bool = False) -> str:
     # Fall back to search
     search_type = "folder" if force_folder else None
     
+    ui = getattr(player, "ui", player) if player else None
+    
     progress_msgs = []
     def on_progress(msg: str):
         progress_msgs.append(msg)
@@ -654,23 +698,58 @@ def _smart_open(params: dict, player=None, force_folder: bool = False) -> str:
             player.write_log(f"[open] {msg}")
 
     engine = get_engine()
-    result = engine.search(
+    
+    if name:
+        cached_match = engine.select_from_last_search(name)
+        if cached_match:
+            target_path = cached_match["path"]
+            engine.record_open(name, target_path)
+            open_msg = ExplorerManager.open(target_path)
+            if ui and hasattr(ui, "broadcast"):
+                ui.broadcast({"type": "tts", "text": "I found it in the cache and opened it."})
+            return f"Opened from recent search: {cached_match['name']}\n{open_msg}"
+            
+    accumulated_results = []
+    def on_partial(batch: list):
+        accumulated_results.extend(batch)
+        if ui and hasattr(ui, "broadcast"):
+            ui.broadcast({
+                "type": "chat_search_results",
+                "query": name,
+                "results": accumulated_results
+            })
+            
+    def on_diagnostics(diag_data: dict):
+        if ui and hasattr(ui, "broadcast"):
+            ui.broadcast({
+                "type": "diagnostics_update",
+                "data": diag_data
+            })
+            
+    def on_complete(result: dict):
+        if result["status"] == "found" and result["count"] == 1:
+            target_path = result["results"][0]["path"]
+            engine.record_open(name, target_path)
+            ExplorerManager.open(target_path)
+            if ui and hasattr(ui, "broadcast"):
+                ui.broadcast({"type": "tts", "text": "I found your file and opened it."})
+        elif result["status"] == "multiple":
+            if ui and hasattr(ui, "broadcast"):
+                ui.broadcast({
+                    "type": "chat_search_results",
+                    "query": name,
+                    "results": result.get("results", [])
+                })
+
+    engine.search_async(
         query=name,
         drive=drive,
         search_type=search_type,
         on_progress=on_progress,
+        on_partial=on_partial,
+        on_diagnostics=on_diagnostics,
+        on_complete=on_complete,
         max_results=20,
     )
 
-    if result["status"] == "found" and result["count"] == 1:
-        # Single match — auto-open
-        target_path = result["results"][0]["path"]
-        open_msg = ExplorerManager.open(target_path)
-        return f"{result['message']}\n{open_msg}"
-
-    elif result["status"] == "multiple":
-        # Multiple matches — ask the user
-        return result["message"]
-
-    else:
-        return result["message"]
+    return f"Searching for '{name}' in the background. I will open it as soon as I find it."

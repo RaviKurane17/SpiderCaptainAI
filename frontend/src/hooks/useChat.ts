@@ -84,20 +84,32 @@ export function useChat(wsRef: React.MutableRefObject<WebSocket | null>) {
                             return newMsgs;
                         });
                     }
-                } else if (data.type === "memory_suggestion") {
-                    if (activeSessionId) {
-                        setMessages(prev => [...prev, {
-                            role: "memory_suggestion",
-                            content: JSON.stringify({
-                                title: data.title,
-                                summary: data.summary,
-                                category: data.category
-                            }),
-                            timestamp: Date.now() / 1000
-                        }]);
+                    } else if (data.type === "memory_suggestion") {
+                        if (activeSessionId) {
+                            setMessages(prev => [...prev, {
+                                role: "memory_suggestion",
+                                content: JSON.stringify({
+                                    title: data.title,
+                                    summary: data.summary,
+                                    category: data.category
+                                }),
+                                timestamp: Date.now() / 1000
+                            }]);
+                        }
+                    } else if (data.type === "chat_search_results") {
+                        if (activeSessionId) {
+                            setMessages(prev => [...prev, {
+                                role: "system",
+                                content: JSON.stringify({
+                                    type: "search_results",
+                                    query: data.query,
+                                    data: data.results
+                                }),
+                                timestamp: Date.now() / 1000
+                            }]);
+                        }
                     }
-                }
-            } catch (err) {}
+                } catch (err) {}
         };
 
         if (wsRef.current) {

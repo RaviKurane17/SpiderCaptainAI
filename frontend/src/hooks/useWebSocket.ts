@@ -6,9 +6,10 @@ export interface LogRow {
     who: string;
     icon: React.ElementType;
     color: string;
-    text: string;
+    text: string | React.ReactNode;
     time: string;
     done?: boolean;
+    payload?: any;
 }
 
 export interface Metrics {
@@ -43,6 +44,7 @@ export function useWebSocket() {
     const [navigatePage, setNavigatePage] = useState<string | null>(null);
     const [remindersData,setRemindersData]= useState<any[] | null>(null);
     const [logs,         setLogs]         = useState<LogRow[]>([]);
+    const [diagnostics,  setDiagnostics]  = useState<any>(null);
     const [lastMessage,  setLastMessage]  = useState<any>(null);
     const [setupComplete, setSetupComplete] = useState<boolean | null>(null);
     const [initialSettings, setInitialSettings] = useState<any>(null);
@@ -148,6 +150,8 @@ export function useWebSocket() {
                         setIsMuted(data.muted);
                     } else if (type === "volume_muted") {
                         setIsVolumeMuted(data.muted);
+                    } else if (type === "diagnostics_update") {
+                        setDiagnostics(data.data);
                     } else if (type === "log") {
                         const entry = data.log;
                         if (!entry) return;
@@ -163,6 +167,15 @@ export function useWebSocket() {
                             text: entry.text,
                             time: entry.time,
                             done: who === "CAPTAIN" && (entry.text as string).includes("Done"),
+                        });
+                    } else if (type === "chat_search_results") {
+                        appendLog({
+                            who: "SYSTEM",
+                            icon: Compass,
+                            color: "text-muted-foreground",
+                            text: `Found ${data.results?.length || 0} matching items`,
+                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            payload: { type: "search_results", query: data.query, data: data.results }
                         });
                     } else if (type === "all_settings_data") {
                         if (data.settings) {
@@ -293,7 +306,7 @@ export function useWebSocket() {
     }, [sendCommand]);
 
     return {
-        isConnected, isMuted, isVolumeMuted, aiState, metrics, latency, navigatePage, remindersData, logs, lastMessage, setupComplete, initialSettings,
+        isConnected, isMuted, isVolumeMuted, aiState, metrics, latency, navigatePage, remindersData, logs, diagnostics, lastMessage, setupComplete, initialSettings,
         wsRef, sendCommand, setNavigatePage,
         // expose appendLog as setLogs replacement for useReminders
         setLogs: useCallback(

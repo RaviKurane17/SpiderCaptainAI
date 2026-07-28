@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { 
     MessageSquare, Pin, PinOff, Plus, Search, Trash2, 
     MoreVertical, Send, Mic, Image as ImageIcon, Paperclip, 
-    StopCircle, Activity, Clock
+    StopCircle, Activity, Clock, Folder, File as FileIcon, HardDrive, Compass
 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -16,6 +16,7 @@ import { ChatHeader } from "../chat/ChatHeader";
 import { ChatComposer } from "../chat/ChatComposer";
 import { ChatSidebar } from "../chat/ChatSidebar";
 import { MemorySuggestionCard } from "../chat/MemorySuggestionCard";
+import { SearchResultsWidget } from "../SearchResultsWidget";
 import { cn } from "@/lib/utils";
 
 // Assuming Shadcn exports
@@ -126,6 +127,32 @@ export const ChatPanel: React.FC<ChatPanelProps> = React.memo(({ wsRef }) => {
                                             <MemorySuggestionCard data={parsed} />
                                         </div>
                                     );
+                                }
+                                if (m.role === "system" && m.content.startsWith("{")) {
+                                    try {
+                                        const parsed = JSON.parse(m.content);
+                                        if (parsed.type === "search_results" && parsed.data && parsed.data.length > 0) {
+                                            return (
+                                                <div key={i} className="flex w-full justify-start">
+                                                    <div className="w-full max-w-[85%] rounded-2xl border border-white/5 bg-black/40 backdrop-blur-md p-4 shadow-xl">
+                                                        <div className="text-[11px] font-bold tracking-[0.2em] text-muted-foreground mb-3 uppercase flex items-center gap-2">
+                                                            <Compass className="h-3.5 w-3.5 text-[var(--cyan)]" /> Search Results
+                                                        </div>
+                                                        <SearchResultsWidget
+                                                            query={parsed.query || ""}
+                                                            results={parsed.data}
+                                                            onOpen={(path) => {
+                                                                if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+                                                                    wsRef.current.send(JSON.stringify({ type: "command", text: `open "${path}"` }));
+                                                                }
+                                                            }}
+                                                            ws={wsRef.current}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                    } catch (e) {}
                                 }
                                 
                                 return (

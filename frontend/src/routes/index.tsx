@@ -16,8 +16,8 @@ import SystemOverview from "../components/SystemOverview";
 import CalendarPanel from "../components/CalendarPanel";
 import { AddReminderModal, ViewAllModal } from "../components/ReminderModals";
 import { SetupWizard } from "../components/ui/SetupWizard";
-
 import { LockScreen } from "../components/ui/LockScreen";
+import { DeveloperDiagnostics } from "../components/DeveloperDiagnostics";
 
 // ── Lazily loaded panels (only when user navigates there) ────────────────────
 const ChatPanel     = lazy(() => import("../components/panels/chat_panel").then((m) => ({ default: m.ChatPanel })));
@@ -64,6 +64,21 @@ function CaptainAI() {
     // Lock screen states
     const [isLocked, setIsLocked] = useState(false);
     const [lockType, setLockType] = useState("");
+    
+    // Developer Diagnostics Panel
+    const [showDiagnostics, setShowDiagnostics] = useState(false);
+
+    React.useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            // Toggle Developer Diagnostics with Ctrl + Shift + D
+            if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'd') {
+                e.preventDefault();
+                setShowDiagnostics((prev) => !prev);
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, []);
 
     React.useEffect(() => {
         if (showStartup) {
@@ -95,7 +110,7 @@ function CaptainAI() {
     const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
 
     const {
-        isConnected, isMuted, isVolumeMuted, aiState, metrics, latency, navigatePage, setNavigatePage, remindersData, logs,
+        isConnected, isMuted, isVolumeMuted, aiState, metrics, latency, navigatePage, setNavigatePage, remindersData, logs, diagnostics,
         wsRef, setLogs, setupComplete, initialSettings,
         handleSendCommand, handleMicToggle, handleVolumeToggle,
         handleBrightnessToggle: _brightnessWS, handlePowerClick: _powerWS,
@@ -277,7 +292,7 @@ function CaptainAI() {
                                 <div className="relative z-10 flex min-h-0 flex-1 w-full items-center justify-center">
                                     <Visualizer aiState={aiState} />
                                 </div>
-                                <ActivityCard rows={logs} />
+                                <ActivityCard rows={logs} onCommand={handleSendCommand} />
                                 <Composer isMuted={isMuted} onMicToggle={handleMicToggle} onSend={handleSendCommand} />
                             </section>
                         </main>
@@ -369,6 +384,13 @@ function CaptainAI() {
             )}
 
             {/* ── OVERLAYS ─────────────────────────────────────────────── */}
+            {showDiagnostics && (
+                <DeveloperDiagnostics 
+                    data={diagnostics} 
+                    onClose={() => setShowDiagnostics(false)} 
+                />
+            )}
+            
             {brightness < 100 && (
                 <div
                     className="pointer-events-none fixed inset-0 z-[9999] bg-black transition-opacity duration-300"
