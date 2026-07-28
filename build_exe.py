@@ -33,7 +33,11 @@ hidden_imports = [
     'duckduckgo_search',
     'firebase_admin',
     'geopy',
-    'dotenv'
+    'dotenv',
+    'win10toast',
+    'pycaw',
+    'PyQt6',
+    'core.orb'
 ]
 
 # Exclude massive unused ML frameworks that break the build

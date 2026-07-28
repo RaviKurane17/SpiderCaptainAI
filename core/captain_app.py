@@ -202,24 +202,80 @@ def start_ui():
     # ── Launch pywebview ───────────────────────────────────────────────
     import webview
     
+    global window, orb_window
     window = None
-
+    orb_window = None
     class WindowAPI:
+        def __init__(self):
+            self.orb_process = None
+
         def close(self):
             import os
             os._exit(0)
+
         def minimize(self):
             try:
                 if window:
                     window.minimize()
             except Exception:
                 pass
+
         def maximize(self):
             try:
                 if window:
                     window.toggle_fullscreen()
             except Exception:
                 pass
+
+        def orb_mode(self):
+            try:
+                if window:
+                    window.hide()
+                
+                # Launch the PyQt6 orb in a separate process
+                import subprocess
+                import sys
+                import os
+                
+                orb_script = os.path.join(os.path.dirname(__file__), "orb.py")
+                
+                # We use creationflags to avoid popping a terminal on Windows
+                kwargs = {}
+                if sys.platform == "win32":
+                    kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+                
+                self.orb_process = subprocess.Popen(
+                    [sys.executable, orb_script],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    bufsize=1,
+                    **kwargs
+                )
+                
+                def monitor_orb():
+                    try:
+                        for line in self.orb_process.stdout:
+                            if "RESTORE" in line:
+                                self.restore_main()
+                                break
+                    except Exception:
+                        pass
+                
+                threading.Thread(target=monitor_orb, daemon=True).start()
+                
+            except Exception as e:
+                log.error(f"Failed to launch orb: {e}")
+
+        def restore_main(self):
+            try:
+                if self.orb_process:
+                    self.orb_process.terminate()
+                    self.orb_process = None
+                if window:
+                    window.show()
+            except Exception as e:
+                log.error(f"Failed to restore from orb: {e}")
 
     api_instance = WindowAPI()
 
@@ -239,6 +295,7 @@ def start_ui():
         frameless=True,
         js_api=api_instance
     )
+
     
     try:
         import pyi_splash

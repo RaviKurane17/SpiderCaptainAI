@@ -8,6 +8,7 @@ const TitleBar = React.memo(function TitleBar() {
             if (action === "minimize") api.minimize();
             else if (action === "maximize") api.maximize();
             else if (action === "close") api.close();
+            else if (action === "orb_mode") api.orb_mode();
         } else {
             if (action === "close") window.close();
         }
@@ -15,7 +16,11 @@ const TitleBar = React.memo(function TitleBar() {
 
     return (
         <div className="glass-panel flex h-14 items-center justify-between px-3 pywebview-drag-region select-none">
-            <div className="flex h-9 w-9 items-center justify-center rounded-md bg-gradient-to-br from-[oklch(0.75_0.22_225)] to-[oklch(0.55_0.24_285)] shadow-[0_0_20px_oklch(0.75_0.22_225/0.5)]">
+            <div 
+                onClick={() => handleControl("orb_mode")}
+                className="flex h-9 w-9 items-center justify-center rounded-md bg-gradient-to-br from-[oklch(0.75_0.22_225)] to-[oklch(0.55_0.24_285)] shadow-[0_0_20px_oklch(0.75_0.22_225/0.5)] cursor-pointer hover:scale-105 hover:brightness-110 transition-all duration-300 no-drag"
+                title="Switch to Orb Mode"
+            >
                 <Box className="h-4.5 w-4.5 text-primary-foreground" strokeWidth={2} />
             </div>
             <div className="flex gap-1">
