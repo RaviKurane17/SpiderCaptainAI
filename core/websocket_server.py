@@ -598,6 +598,46 @@ async def ws_handler(websocket, path=None):
                 except Exception as e:
                     log.error(f"[WS SERVER] Error searching tools: {e}")
 
+            elif msg_type in ["tool_action_run", "tool_action_stop"]:
+                try:
+                    tool_id = data.get("tool_id")
+                    enable = msg_type == "tool_action_run"
+                    from core.tool_manager import toggle_tool_status
+                    res = await asyncio.to_thread(toggle_tool_status, tool_id, enable)
+                    await websocket.send(json.dumps({
+                        "type": "tool_action_result",
+                        "action": "status_toggle",
+                        "result": res
+                    }))
+                except Exception as e:
+                    log.error(f"[WS SERVER] Error toggling tool status: {e}")
+
+            elif msg_type == "tool_action_pin":
+                try:
+                    tool_id = data.get("tool_id")
+                    from core.tool_manager import toggle_pin_tool
+                    res = await asyncio.to_thread(toggle_pin_tool, tool_id)
+                    await websocket.send(json.dumps({
+                        "type": "tool_action_result",
+                        "action": "pin",
+                        "result": res
+                    }))
+                except Exception as e:
+                    log.error(f"[WS SERVER] Error pinning tool: {e}")
+
+            elif msg_type == "tool_action_health":
+                try:
+                    tool_id = data.get("tool_id")
+                    from core.tool_manager import run_health_check
+                    res = await asyncio.to_thread(run_health_check, tool_id)
+                    await websocket.send(json.dumps({
+                        "type": "tool_action_result",
+                        "action": "health",
+                        "result": res
+                    }))
+                except Exception as e:
+                    log.error(f"[WS SERVER] Error running tool health check: {e}")
+
             elif msg_type == "update_tool_permission":
                 try:
                     tool_id = data.get("tool_id")

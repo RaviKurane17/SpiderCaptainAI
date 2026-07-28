@@ -189,5 +189,50 @@ def update_tool_permission(tool_id: str, new_permission: str):
     conn.commit()
     return {"success": True}
 
+def toggle_tool_status(tool_id: str, enable: bool):
+    conn = get_db_conn()
+    cursor = conn.cursor()
+    new_status = "Enabled" if enable else "Disabled"
+    cursor.execute("UPDATE tools SET status = ? WHERE id = ?", (new_status, tool_id))
+    conn.commit()
+    return {"success": True, "status": new_status}
+
+def toggle_pin_tool(tool_id: str):
+    conn = get_db_conn()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT is_pinned FROM tools WHERE id = ?", (tool_id,))
+        row = cursor.fetchone()
+        if row is None:
+            return {"success": False, "error": "Tool not found"}
+        
+        current_pin = row['is_pinned'] if 'is_pinned' in row.keys() else 0
+        new_pin = 1 if not current_pin else 0
+        
+        cursor.execute("UPDATE tools SET is_pinned = ? WHERE id = ?", (new_pin, tool_id))
+        conn.commit()
+        return {"success": True, "pinned": new_pin}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+def run_health_check(tool_id: str):
+    import random
+    conn = get_db_conn()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT id FROM tools WHERE id = ?", (tool_id,))
+        if cursor.fetchone() is None:
+            return {"success": False, "error": "Tool not found"}
+            
+        # Simulate health check logic
+        is_healthy = random.random() > 0.1 # 90% chance of success
+        health_status = "Operational" if is_healthy else "Warning"
+        
+        cursor.execute("UPDATE tools SET health = ? WHERE id = ?", (health_status, tool_id))
+        conn.commit()
+        return {"success": True, "health": health_status}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
 # Initialize on import
 init_tools_db()

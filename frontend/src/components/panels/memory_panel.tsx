@@ -64,11 +64,18 @@ export const MemoryPanel: React.FC = () => {
 
     const handleDelete = (id: string) => {
         ws.sendCommand({ type: "delete_memory", memory_id: id });
+        setTimeout(() => {
+            ws.sendCommand({ type: "get_memory_stats" });
+            ws.sendCommand({ type: "search_memories", query, category, limit: 50, offset: 0 });
+        }, 300);
     };
 
     const handlePin = (id: string) => {
-        // Optimistic UI update could go here
         ws.sendCommand({ type: "toggle_pin_memory", memory_id: id });
+        setTimeout(() => {
+            ws.sendCommand({ type: "get_memory_stats" });
+            ws.sendCommand({ type: "search_memories", query, category, limit: 50, offset: 0 });
+        }, 300);
     };
 
     const handleEdit = (m: MemoryRecord) => {
@@ -89,6 +96,10 @@ export const MemoryPanel: React.FC = () => {
             // Adding new memory
             ws.sendCommand({ type: "add_memory_direct", ...data });
         }
+        setTimeout(() => {
+            ws.sendCommand({ type: "get_memory_stats" });
+            ws.sendCommand({ type: "search_memories", query, category, limit: 50, offset: 0 });
+        }, 300);
     };
 
     return (

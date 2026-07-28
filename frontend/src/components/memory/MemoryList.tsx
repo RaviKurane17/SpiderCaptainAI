@@ -137,10 +137,10 @@ const MemoryCard = ({ memory, onDelete, onPin, onEdit }: { memory: MemoryRecord,
             </ContextMenuTrigger>
             
             <ContextMenuContent className="w-48 bg-black/90 backdrop-blur-xl border-white/10 text-white">
-                <ContextMenuItem onClick={onEdit} className="text-xs cursor-pointer hover:bg-white/10">
+                <ContextMenuItem onSelect={onEdit} className="text-xs cursor-pointer hover:bg-white/10">
                     <Edit2 className="mr-2 w-4 h-4" /> Edit Memory
                 </ContextMenuItem>
-                <ContextMenuItem onClick={onPin} className="text-xs cursor-pointer hover:bg-white/10">
+                <ContextMenuItem onSelect={onPin} className="text-xs cursor-pointer hover:bg-white/10">
                     {memory.pinned === 1 ? <PinOff className="mr-2 w-4 h-4" /> : <Pin className="mr-2 w-4 h-4" />}
                     {memory.pinned === 1 ? "Unpin Memory" : "Pin to Working Context"}
                 </ContextMenuItem>
@@ -148,7 +148,7 @@ const MemoryCard = ({ memory, onDelete, onPin, onEdit }: { memory: MemoryRecord,
                     <Combine className="mr-2 w-4 h-4" /> Merge with...
                 </ContextMenuItem>
                 <ContextMenuSeparator className="bg-white/10" />
-                <ContextMenuItem onClick={onDelete} className="text-xs text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 cursor-pointer">
+                <ContextMenuItem onSelect={onDelete} className="text-xs text-rose-400 hover:bg-rose-500/20 hover:text-rose-300 cursor-pointer">
                     <Trash2 className="mr-2 w-4 h-4" /> Forget Memory
                 </ContextMenuItem>
             </ContextMenuContent>

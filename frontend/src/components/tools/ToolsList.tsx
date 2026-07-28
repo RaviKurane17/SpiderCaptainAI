@@ -107,9 +107,9 @@ export const ToolsList: React.FC<ToolsListProps> = ({ tools, onAction }) => {
                                     </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="bg-black/95 border-white/10 backdrop-blur-xl">
-                                    <DropdownMenuItem onClick={() => onAction(t.id, 'set_permission', 'Allowed')} className="text-emerald-400 cursor-pointer focus:bg-white/10">Allowed (Auto)</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => onAction(t.id, 'set_permission', 'Ask Every Time')} className="text-amber-400 cursor-pointer focus:bg-white/10">Ask Every Time</DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => onAction(t.id, 'set_permission', 'Blocked')} className="text-rose-400 cursor-pointer focus:bg-white/10">Blocked</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => onAction(t.id, 'set_permission', 'Allowed')} className="text-emerald-400 cursor-pointer focus:bg-white/10">Allowed (Auto)</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => onAction(t.id, 'set_permission', 'Ask Every Time')} className="text-amber-400 cursor-pointer focus:bg-white/10">Ask Every Time</DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => onAction(t.id, 'set_permission', 'Blocked')} className="text-rose-400 cursor-pointer focus:bg-white/10">Blocked</DropdownMenuItem>
                                 </DropdownMenuContent>
                             </DropdownMenu>
 
@@ -120,21 +120,21 @@ export const ToolsList: React.FC<ToolsListProps> = ({ tools, onAction }) => {
                                     </button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="bg-black/95 border-white/10 backdrop-blur-xl w-48">
-                                    <DropdownMenuItem onClick={() => onAction(t.id, 'run')} className="text-white cursor-pointer focus:bg-white/10">
+                                    <DropdownMenuItem onSelect={() => onAction(t.id, 'run')} className="text-white cursor-pointer focus:bg-white/10">
                                         <Play className="w-4 h-4 mr-2 text-emerald-400" /> Run Tool
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => onAction(t.id, 'stop')} className="text-white cursor-pointer focus:bg-white/10">
+                                    <DropdownMenuItem onSelect={() => onAction(t.id, 'stop')} className="text-white cursor-pointer focus:bg-white/10">
                                         <Square className="w-4 h-4 mr-2 text-rose-400" /> Stop Tool
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator className="bg-white/10" />
-                                    <DropdownMenuItem onClick={() => onAction(t.id, 'logs')} className="text-white cursor-pointer focus:bg-white/10">
+                                    <DropdownMenuItem onSelect={() => onAction(t.id, 'logs')} className="text-white cursor-pointer focus:bg-white/10">
                                         <Eye className="w-4 h-4 mr-2 text-blue-400" /> View Logs
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => onAction(t.id, 'test')} className="text-white cursor-pointer focus:bg-white/10">
+                                    <DropdownMenuItem onSelect={() => onAction(t.id, 'test')} className="text-white cursor-pointer focus:bg-white/10">
                                         <Activity className="w-4 h-4 mr-2 text-[var(--cyan)]" /> Test / Health Check
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator className="bg-white/10" />
-                                    <DropdownMenuItem onClick={() => onAction(t.id, 'toggle_pin')} className="text-white cursor-pointer focus:bg-white/10">
+                                    <DropdownMenuItem onSelect={() => onAction(t.id, 'toggle_pin')} className="text-white cursor-pointer focus:bg-white/10">
                                         {t.is_pinned ? "Unpin Tool" : "Pin Tool"}
                                     </DropdownMenuItem>
                                 </DropdownMenuContent>

@@ -58,11 +58,33 @@ export const ToolsPanel: React.FC = () => {
     };
 
     const handleToolAction = (toolId: string, action: string, data?: any) => {
+        let sent = false;
         if (action === "set_permission") {
             ws.sendCommand({ type: "update_tool_permission", tool_id: toolId, permission: data });
+            sent = true;
+        } else if (action === "run") {
+            ws.sendCommand({ type: "tool_action_run", tool_id: toolId });
+            sent = true;
+        } else if (action === "stop") {
+            ws.sendCommand({ type: "tool_action_stop", tool_id: toolId });
+            sent = true;
+        } else if (action === "toggle_pin") {
+            ws.sendCommand({ type: "tool_action_pin", tool_id: toolId });
+            sent = true;
+        } else if (action === "test") {
+            ws.sendCommand({ type: "tool_action_health", tool_id: toolId });
+            sent = true;
+        } else if (action === "logs") {
+            console.log(`View logs for tool ${toolId}`);
         } else {
             console.log(`Action ${action} on tool ${toolId} - UI placeholder`);
-            // Other actions can be wired to backend as needed
+        }
+
+        if (sent) {
+            setTimeout(() => {
+                ws.sendCommand({ type: "get_tools_stats" });
+                ws.sendCommand({ type: "search_tools", query, category, status, limit: 50, offset: 0 });
+            }, 300);
         }
     };
 
