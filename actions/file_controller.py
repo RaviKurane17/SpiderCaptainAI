@@ -507,11 +507,46 @@ def file_controller(
             )
 
         elif action == "find":
-            return find_files(
-                name=name or params.get("name", ""),
-                extension=params.get("extension", ""),
-                path=path,
-                max_results=min(int(params.get("max_results", 20)), 50),
+            # Legacy find — still works but now uses the new engine
+            return _smart_search(params, player)
+
+        elif action == "search":
+            # New advanced search action
+            return _smart_search(params, player)
+
+        elif action == "open":
+            # Open a file or folder — searches if no full path given
+            return _smart_open(params, player)
+
+        elif action == "open_folder":
+            # Explicitly open a folder
+            return _smart_open(params, player, force_folder=True)
+
+        elif action == "reveal":
+            # Open parent folder and highlight the file
+            from actions.files.explorer import ExplorerManager
+            target = _resolve_path(path)
+            if name:
+                target = target / name
+            return ExplorerManager.reveal(str(target))
+
+        elif action == "rebuild_index":
+            # Force rebuild the file index cache
+            from actions.files.engine import get_engine
+            drive = params.get("drive", None)
+            drives = [drive] if drive else None
+            engine = get_engine()
+            engine.rebuild_index(drives=drives)
+            return "File index rebuild started in background. Future searches will be much faster."
+
+        elif action == "index_stats":
+            from actions.files.engine import get_engine
+            stats = get_engine().get_index_stats()
+            return (
+                f"File Index Stats:\n"
+                f"  Total indexed: {stats['total_indexed']:,}\n"
+                f"  Indexed drives: {', '.join(stats['indexed_drives']) or 'None'}\n"
+                f"  Currently indexing: {'Yes' if stats['is_indexing'] else 'No'}"
             )
 
         elif action == "largest":
@@ -534,3 +569,108 @@ def file_controller(
 
     except Exception as e:
         return f"File controller error ({action}): {e}"
+
+
+# ── New Search/Open Helpers (delegate to FileSearchEngine) ─────────────────
+
+def _smart_search(params: dict, player=None) -> str:
+    """
+    Advanced search using FileSearchEngine.
+    Supports: name, drive, search_type (file/folder), extension.
+    """
+    from actions.files.engine import get_engine
+
+    query = params.get("name", "") or params.get("query", "")
+    drive = params.get("drive", None)
+    search_type = params.get("search_type", None)  # "file", "folder", or None
+    extension = params.get("extension", None)
+    path = params.get("path", "")
+
+    # If path looks like a drive letter, extract it
+    if path and len(path) <= 3 and path[0].isalpha():
+        drive = path[0].upper()
+
+    progress_msgs = []
+    def on_progress(msg: str):
+        progress_msgs.append(msg)
+        if player:
+            player.write_log(f"[search] {msg}")
+
+    engine = get_engine()
+    result = engine.search(
+        query=query,
+        drive=drive,
+        search_type=search_type,
+        extension=extension,
+        on_progress=on_progress,
+        max_results=30,
+    )
+
+    return result["message"]
+
+
+def _smart_open(params: dict, player=None, force_folder: bool = False) -> str:
+    """
+    Smart open: if a full path is given, open it directly.
+    If only a name is given, search for it first, then:
+      - If 1 result: auto-open
+      - If multiple: ask the user which one
+    """
+    from actions.files.engine import get_engine
+    from actions.files.explorer import ExplorerManager
+
+    name = params.get("name", "") or params.get("query", "")
+    path = params.get("path", "")
+    drive = params.get("drive", None)
+
+    # If a full absolute path is given, open directly
+    if path and (Path(path).is_absolute() or (len(path) >= 2 and path[1] == ":")):
+        target = Path(path)
+        if name:
+            target = target / name
+        if target.exists():
+            return ExplorerManager.open(str(target))
+        # Path doesn't exist — fall through to search
+
+    # If path is a shortcut like "desktop", "downloads", try resolving
+    if path and not drive:
+        resolved = _resolve_path(path)
+        if name:
+            candidate = resolved / name
+            if candidate.exists():
+                return ExplorerManager.open(str(candidate))
+
+    # Extract drive from path if it looks like a drive letter
+    if path and len(path) <= 3 and path[0].isalpha():
+        drive = path[0].upper()
+
+    # Fall back to search
+    search_type = "folder" if force_folder else None
+    
+    progress_msgs = []
+    def on_progress(msg: str):
+        progress_msgs.append(msg)
+        if player:
+            player.write_log(f"[open] {msg}")
+
+    engine = get_engine()
+    result = engine.search(
+        query=name,
+        drive=drive,
+        search_type=search_type,
+        on_progress=on_progress,
+        max_results=20,
+    )
+
+    if result["status"] == "found" and result["count"] == 1:
+        # Single match — auto-open
+        target_path = result["results"][0]["path"]
+        open_msg = ExplorerManager.open(target_path)
+        return f"{result['message']}\n{open_msg}"
+
+    elif result["status"] == "multiple":
+        # Multiple matches — ask the user
+        return result["message"]
+
+    else:
+        return result["message"]

@@ -23,7 +23,11 @@ TOOL ROUTING:
 - computer_control: Mouse, keyboard, hotkeys, UI automation
 - computer_settings: Volume, brightness, WiFi, power, processes
 - browser_control: Web navigation
-- file_controller: File management
+- file_controller: File management (list, create, delete, move, copy, rename, read, write, search, open, open_folder, reveal, rebuild_index)
+  * For "open demo folder" or "find resume.pdf": use action="open", name="demo" or name="resume.pdf". Add drive="C" to limit to C drive.
+  * For "search MySQL.pdf": use action="search", name="MySQL.pdf"
+  * For "open Java Project folder in F drive": use action="open_folder", name="Java Project", drive="F"
+  * If multiple matches found, show the list and ask the user which one to open. Never randomly choose.
 - code_helper: Code writing/editing
 - dev_agent: Full projects
 - web_search: Internet retrieval

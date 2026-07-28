@@ -133,17 +133,28 @@ TOOL_DECLARATIONS = [
 
     {
         "name": "file_controller",
-        "description": "Manages files and folders: list, create, delete, move, copy, rename, read, write, find, disk usage.",
+        "description": (
+            "Manages files and folders. Actions: list, create_file, create_folder, delete, move, copy, rename, read, write, "
+            "search, open, open_folder, reveal, find, largest, disk_usage, organize_desktop, info, rebuild_index, index_stats. "
+            "For 'search' and 'open': set 'name' to the search term. Optionally set 'drive' to a letter like C, D, F to limit search to that drive. "
+            "Set 'search_type' to 'file' or 'folder' to filter results. "
+            "For 'open': if only 1 result is found, the file/folder is opened automatically. If multiple matches exist, a list is shown for the user to choose. "
+            "Use 'open_folder' to explicitly search for and open a folder. "
+            "Use 'reveal' to open the parent folder and highlight the item. "
+            "Use 'rebuild_index' to force re-scan of drives for faster future searches."
+        ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action":      {"type": "STRING", "description": "list | create_file | create_folder | delete | move | copy | rename | read | write | find | largest | disk_usage | organize_desktop | info"},
-                "path":        {"type": "STRING", "description": "File/folder path or shortcut: desktop, downloads, documents, home"},
+                "action":      {"type": "STRING", "description": "list | create_file | create_folder | delete | move | copy | rename | read | write | search | open | open_folder | reveal | find | largest | disk_usage | organize_desktop | info | rebuild_index | index_stats"},
+                "path":        {"type": "STRING", "description": "File/folder path or shortcut: desktop, downloads, documents, home. For search/open with a drive, use the drive letter like C or D."},
                 "destination": {"type": "STRING", "description": "Destination path for move/copy"},
                 "new_name":    {"type": "STRING", "description": "New name for rename"},
                 "content":     {"type": "STRING", "description": "Content for create_file/write"},
-                "name":        {"type": "STRING", "description": "File name to search for"},
-                "extension":   {"type": "STRING", "description": "File extension to search (e.g. .pdf)"},
+                "name":        {"type": "STRING", "description": "File or folder name to search for / open"},
+                "extension":   {"type": "STRING", "description": "File extension filter (e.g. .pdf, .java)"},
+                "drive":       {"type": "STRING", "description": "Drive letter to search in (e.g. C, D, F). If omitted, searches all drives."},
+                "search_type": {"type": "STRING", "description": "Filter: 'file' for files only, 'folder' for folders only. Omit for both."},
                 "count":       {"type": "INTEGER", "description": "Number of results for largest"},
             },
             "required": ["action"]
