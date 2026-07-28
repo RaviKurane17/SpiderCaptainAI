@@ -237,15 +237,21 @@ def start_ui():
                 import sys
                 import os
                 
-                orb_script = os.path.join(os.path.dirname(__file__), "orb.py")
-                
                 # We use creationflags to avoid popping a terminal on Windows
                 kwargs = {}
                 if sys.platform == "win32":
                     kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+
+                if getattr(sys, 'frozen', False):
+                    # Running as a PyInstaller .exe — re-launch self with --orb flag
+                    cmd = [sys.executable, '--orb']
+                else:
+                    # Running as plain Python in dev mode
+                    orb_script = os.path.join(os.path.dirname(__file__), "orb.py")
+                    cmd = [sys.executable, orb_script]
                 
                 self.orb_process = subprocess.Popen(
-                    [sys.executable, orb_script],
+                    cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,

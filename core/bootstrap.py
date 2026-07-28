@@ -28,6 +28,15 @@ def run_app():
     multiprocessing.freeze_support()
     init_environment()
     
+    if len(sys.argv) > 1 and sys.argv[1] == '--orb':
+        # Launched by captain_app to show the orb window (frozen exe mode)
+        from PyQt6.QtWidgets import QApplication
+        from core.orb import OrbWindow
+        app = QApplication(sys.argv)
+        orb = OrbWindow()
+        orb.show()
+        sys.exit(app.exec())
+
     if len(sys.argv) > 1 and sys.argv[1].endswith('.py'):
         try:
             runpy.run_path(sys.argv[1], run_name="__main__")
