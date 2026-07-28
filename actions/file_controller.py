@@ -629,14 +629,21 @@ def _smart_search(params: dict, player=None, speak=None) -> str:
             })
             
     def on_complete(result: dict):
-        if ui and hasattr(ui, "broadcast") and result.get("status") == "multiple":
+        status = result.get("status")
+        results = result.get("results", [])
+        if ui and hasattr(ui, "broadcast") and status in ("multiple", "found"):
             ui.broadcast({
                 "type": "chat_search_results",
                 "query": query,
-                "results": result.get("results", [])
+                "results": results
             })
             if speak:
-                speak(f"I found {len(result.get('results', []))} results. I've sent them to your screen.")
+                if status == "found" or len(results) == 1:
+                    speak("I found 1 result. I've sent it to your screen.")
+                else:
+                    speak(f"I found {len(results)} results. I've sent them to your screen.")
+        elif status == "not_found" and speak:
+            speak("I couldn't find any matching files or folders.")
 
     engine = get_engine()
     engine.search_async(
@@ -756,6 +763,8 @@ def _smart_open(params: dict, player=None, force_folder: bool = False, speak=Non
                     "query": name,
                     "results": result.get("results", [])
                 })
+        elif result["status"] == "not_found" and speak:
+            speak("I couldn't find any matching files or folders to open.")
 
     engine.search_async(
         query=name,

@@ -117,11 +117,9 @@ def add_chat_message(session_id: str, role: str, content: str, tokens: int = 0, 
         with sqlite3.connect(CHAT_DB_PATH) as conn:
             cursor = conn.cursor()
             # Ensure session exists (auto-create if it doesn't)
-            cursor.execute("SELECT id FROM chat_sessions WHERE id = ?", (session_id,))
-            if not cursor.fetchone():
-                title = content[:30] + "..." if role == "user" else "New Chat"
-                cursor.execute("INSERT INTO chat_sessions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)", 
-                               (session_id, title, now, now))
+            title = content[:30] + "..." if role == "user" else "New Chat"
+            cursor.execute("INSERT OR IGNORE INTO chat_sessions (id, title, created_at, updated_at) VALUES (?, ?, ?, ?)", 
+                           (session_id, title, now, now))
             
             cursor.execute('''
                 INSERT INTO chat_messages (session_id, role, content, attachments, tokens, latency, timestamp)

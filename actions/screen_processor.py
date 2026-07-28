@@ -103,12 +103,17 @@ def _get_adaptive_settings() -> dict:
 
 
 _SYSTEM_PROMPT = (
-    "You are CAPTAIN, an advanced AI assistant. "
-    "Analyze the provided image with precision and intelligence. "
-    "Be concise and direct — maximum two sentences unless the user's question "
-    "requires more detail. "
-    "Address the user respectfully. "
-    "Always call the appropriate tool; never simulate results."
+    "You are CAPTAIN's Vision Module — a highly accurate screen reader and visual analyst. "
+    "When given a screenshot, describe EXACTLY what is visible on screen in detail:\n"
+    "- Which applications or windows are open (e.g. VS Code, Chrome, File Explorer, Notepad)\n"
+    "- What files or documents are open (e.g. 'main.py is open in VS Code', 'index.html in Chrome')\n"
+    "- What text, code, or content is visible on screen\n"
+    "- What UI elements are present (buttons, menus, dialogs, notifications)\n"
+    "- Which window is currently in focus or active\n"
+    "Be specific and accurate — name the exact apps, files, URLs, and text you see. "
+    "Speak naturally as if describing the screen to someone who cannot see it. "
+    "Do NOT say 'I cannot see' or 'I don't have access' — you are receiving the actual screenshot right now. "
+    "Keep responses concise but informative — 2-4 sentences unless the user asks for more detail."
 )
 
 
@@ -358,13 +363,16 @@ class _VisionSession:
                 print("[Vision] ⚠️  No session — dropping image")
                 continue
             try:
-                b64 = base64.b64encode(image_bytes).decode("ascii")
-                await self._session.send(
-                    input=[
-                        {"inline_data": {"mime_type": mime_type, "data": b64}},
-                        {"text": user_text},
-                    ],
-                    end_of_turn=True,
+                content = gtypes.Content(
+                    role="user",
+                    parts=[
+                        gtypes.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+                        gtypes.Part.from_text(text=user_text),
+                    ]
+                )
+                await self._session.send_client_content(
+                    turns=content,
+                    turn_complete=True,
                 )
                 print(f"[Vision] 📤 Sent {len(image_bytes):,} bytes — '{user_text[:60]}'")
             except Exception as e:
@@ -460,7 +468,12 @@ def screen_process(
             image_bytes, mime_type = _capture_camera()
             print(f"[Vision] 📷 Camera: {len(image_bytes):,} bytes")
         else:
-            image_bytes, mime_type = _capture_screen()
+            # Force=True: user explicitly asked, always capture fresh
+            result = _capture_screen(force=True)
+            if result is None:
+                print("[Vision] ⚠️  Screen capture returned None")
+                return False
+            image_bytes, mime_type = result
             print(f"[Vision] 🖥️  Screen: {len(image_bytes):,} bytes")
     except Exception as e:
         print(f"[Vision] ❌ Capture error: {e}")
