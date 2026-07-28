@@ -113,7 +113,8 @@ _SYSTEM_PROMPT = (
     "Be specific and accurate — name the exact apps, files, URLs, and text you see. "
     "Speak naturally as if describing the screen to someone who cannot see it. "
     "Do NOT say 'I cannot see' or 'I don't have access' — you are receiving the actual screenshot right now. "
-    "Keep responses concise but informative — 2-4 sentences unless the user asks for more detail."
+    "Keep responses concise but informative — 2-4 sentences unless the user asks for more detail. "
+    "CRITICAL REQUIREMENT: You MUST analyze the language of the user's question (e.g. Hindi, English, Spanish) and respond EXACTLY in that same language."
 )
 
 
@@ -359,9 +360,9 @@ class _VisionSession:
     async def _send_loop(self) -> None:
         while True:
             image_bytes, mime_type, user_text = await self._out_queue.get()
-            if not self._session:
-                print("[Vision] ⚠️  No session — dropping image")
-                continue
+            while not self._session:
+                print("[Vision] ⚠️  No session — waiting for reconnect...")
+                await asyncio.sleep(1.0)
             try:
                 content = gtypes.Content(
                     role="user",

@@ -106,7 +106,7 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
                 player=ui, session_memory=None,
                 pool=io_pool
             )
-            result = "Vision module activated. Stay completely silent — vision module will speak directly."
+            result = "Vision module activated. Do NOT say anything to the user. Do NOT acknowledge. End your turn immediately in silence."
 
         elif name == "computer_settings":
             from actions.computer_settings import computer_settings
