@@ -359,14 +359,12 @@ class _VisionSession:
                 continue
             try:
                 b64 = base64.b64encode(image_bytes).decode("ascii")
-                await self._session.send_client_content(
-                    turns={
-                        "parts": [
-                            {"inline_data": {"mime_type": mime_type, "data": b64}},
-                            {"text": user_text},
-                        ]
-                    },
-                    turn_complete=True,
+                await self._session.send(
+                    input=[
+                        {"inline_data": {"mime_type": mime_type, "data": b64}},
+                        {"text": user_text},
+                    ],
+                    end_of_turn=True,
                 )
                 print(f"[Vision] 📤 Sent {len(image_bytes):,} bytes — '{user_text[:60]}'")
             except Exception as e:

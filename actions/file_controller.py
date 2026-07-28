@@ -465,6 +465,7 @@ def file_controller(
     response=None,
     player=None,
     session_memory=None,
+    speak=None,
 ) -> str:
     params = parameters or {}
     action = params.get("action", "").lower().strip()
@@ -508,19 +509,19 @@ def file_controller(
 
         elif action == "find":
             # Legacy find — still works but now uses the new engine
-            return _smart_search(params, player)
+            return _smart_search(params, player, speak)
 
         elif action == "search":
             # New advanced search action
-            return _smart_search(params, player)
+            return _smart_search(params, player, speak)
 
         elif action == "open":
             # Open a file or folder — searches if no full path given
-            return _smart_open(params, player)
+            return _smart_open(params, player, speak=speak)
 
         elif action == "open_folder":
             # Explicitly open a folder
-            return _smart_open(params, player, force_folder=True)
+            return _smart_open(params, player, force_folder=True, speak=speak)
 
         elif action == "reveal":
             # Open parent folder and highlight the file
@@ -585,7 +586,7 @@ def _smart_benchmark(params: dict, player=None) -> str:
     engine = get_engine()
     return engine.benchmark_providers(query)
 
-def _smart_search(params: dict, player=None) -> str:
+def _smart_search(params: dict, player=None, speak=None) -> str:
     """
     Advanced search using FileSearchEngine.
     Supports: name, drive, search_type (file/folder), extension.
@@ -634,6 +635,8 @@ def _smart_search(params: dict, player=None) -> str:
                 "query": query,
                 "results": result.get("results", [])
             })
+            if speak:
+                speak(f"I found {len(result.get('results', []))} results. I've sent them to your screen.")
 
     engine = get_engine()
     engine.search_async(
@@ -651,7 +654,7 @@ def _smart_search(params: dict, player=None) -> str:
     return f"Initiated search for '{query}'. Results will stream into the UI shortly."
 
 
-def _smart_open(params: dict, player=None, force_folder: bool = False) -> str:
+def _smart_open(params: dict, player=None, force_folder: bool = False, speak=None) -> str:
     """
     Smart open: if a full path is given, open it directly.
     If only a name is given, search for it first, then:
@@ -705,7 +708,9 @@ def _smart_open(params: dict, player=None, force_folder: bool = False) -> str:
             target_path = cached_match["path"]
             engine.record_open(name, target_path)
             open_msg = ExplorerManager.open(target_path)
-            if ui and hasattr(ui, "broadcast"):
+            if speak:
+                speak("I found it in the cache and opened it.")
+            elif ui and hasattr(ui, "broadcast"):
                 ui.broadcast({"type": "tts", "text": "I found it in the cache and opened it."})
             return f"Opened from recent search: {cached_match['name']}\n{open_msg}"
             
@@ -729,11 +734,22 @@ def _smart_open(params: dict, player=None, force_folder: bool = False) -> str:
     def on_complete(result: dict):
         if result["status"] == "found" and result["count"] == 1:
             target_path = result["results"][0]["path"]
-            engine.record_open(name, target_path)
-            ExplorerManager.open(target_path)
-            if ui and hasattr(ui, "broadcast"):
-                ui.broadcast({"type": "tts", "text": "I found your file and opened it."})
+            open_msg = ExplorerManager.open(target_path)
+            if speak:
+                speak("I found it and opened it for you.")
+            elif ui and hasattr(ui, "broadcast"):
+                ui.broadcast({"type": "tts", "text": "I found it and opened it for you."})
+            if player:
+                player.write_log(f"[open] Auto-opened {result['results'][0]['name']}")
+                if ui and hasattr(ui, "broadcast"):
+                    ui.broadcast({
+                        "type": "chat_search_results",
+                        "query": name,
+                        "results": result.get("results", [])
+                    })
         elif result["status"] == "multiple":
+            if speak:
+                speak(f"I found {len(result.get('results', []))} matches. I've sent them to your screen.")
             if ui and hasattr(ui, "broadcast"):
                 ui.broadcast({
                     "type": "chat_search_results",

@@ -75,7 +75,7 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
 
         elif name == "file_controller":
             from actions.file_controller import file_controller
-            r = await _run_sync(loop, lambda: file_controller(parameters=args, player=ui), pool=io_pool)
+            r = await _run_sync(loop, lambda: file_controller(parameters=args, player=ui, speak=speak_callback), pool=io_pool)
             result = r or "Done."
 
         elif name == "phone_agent":
