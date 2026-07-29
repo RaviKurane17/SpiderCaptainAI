@@ -4,9 +4,11 @@ from PyQt6.QtCore import Qt, QTimer, QPoint
 from PyQt6.QtGui import QPainter, QColor, QRadialGradient, QBrush, QPen
 
 class OrbWindow(QWidget):
-    def __init__(self):
+    def __init__(self, signal_file=None):
         super().__init__()
-        # Window configuration
+        self.signal_file = signal_file
+
+        # Window configuration — truly transparent, always on top, no taskbar entry
         self.setWindowFlags(
             Qt.WindowType.FramelessWindowHint | 
             Qt.WindowType.WindowStaysOnTopHint | 
@@ -22,7 +24,7 @@ class OrbWindow(QWidget):
             (screen.height() - self.height()) // 2
         )
         
-        # Pre-allocate static colors and pens to avoid GC/memory allocation overhead in paintEvent
+        # Pre-allocate static colors and pens — avoids GC/allocation overhead in paintEvent
         self.aura_c1 = QColor(0, 255, 255, 200)
         self.aura_c2 = QColor(0, 85, 255, 120)
         self.aura_c3 = QColor(0, 0, 0, 0)
@@ -38,7 +40,7 @@ class OrbWindow(QWidget):
         self.pulse_direction = 0.5
         self.rotation_angle = 0.0
         
-        # 30ms timer (~33 FPS)
+        # 30ms timer (~33 FPS) — uses hardware-accelerated native drawing, very low CPU
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.update_animation)
         self.timer.start(30)
@@ -73,7 +75,7 @@ class OrbWindow(QWidget):
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawEllipse(center, int(self.pulse_radius), int(self.pulse_radius))
             
-            # 2. Draw rotating tech/spider web lines using save/restore context
+            # 2. Draw rotating spider-web lines using save/restore (prevents coordinate drift)
             painter.save()
             painter.translate(center)
             painter.rotate(self.rotation_angle)
@@ -85,7 +87,7 @@ class OrbWindow(QWidget):
                 painter.drawLine(0, 15, 0, 40)
                 painter.rotate(45.0)
             
-            painter.restore()  # Cleanly resets coordinate system back to normal
+            painter.restore()
             
             # 3. Draw solid glowing inner core
             core_radius = 12.0
@@ -98,8 +100,11 @@ class OrbWindow(QWidget):
             painter.drawEllipse(center, int(core_radius), int(core_radius))
             
         except Exception as e:
-            with open("orb_crash.txt", "w") as f:
-                f.write(str(e))
+            try:
+                with open("orb_crash.txt", "w") as f:
+                    f.write(str(e))
+            except Exception:
+                pass
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -113,16 +118,27 @@ class OrbWindow(QWidget):
         self.drag_pos = None
 
     def mouseDoubleClickEvent(self, event):
-        print("RESTORE", flush=True)
+        """Double-click writes a temp file signal to tell parent to restore the main window."""
+        if self.signal_file:
+            try:
+                with open(self.signal_file, 'w') as f:
+                    f.write('RESTORE')
+            except Exception:
+                pass
         self.close()
 
 if __name__ == '__main__':
     try:
+        # argv[1] = signal_file path (optional, used in both dev and frozen exe mode)
+        signal_file = sys.argv[1] if len(sys.argv) > 1 else None
         app = QApplication(sys.argv)
-        orb = OrbWindow()
+        orb = OrbWindow(signal_file=signal_file)
         orb.show()
         sys.exit(app.exec())
     except Exception as e:
-        with open("orb_crash.txt", "w") as f:
-            import traceback
-            traceback.print_exc(file=f)
+        try:
+            with open("orb_crash.txt", "w") as f:
+                import traceback
+                traceback.print_exc(file=f)
+        except Exception:
+            pass

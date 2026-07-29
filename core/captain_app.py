@@ -229,59 +229,88 @@ def start_ui():
 
         def orb_mode(self):
             try:
-                if window:
-                    window.hide()
-                
-                # Launch the PyQt6 orb in a separate process
                 import subprocess
                 import sys
                 import os
-                
-                # We use creationflags to avoid popping a terminal on Windows
-                kwargs = {}
-                if sys.platform == "win32":
-                    kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+                import tempfile
 
+                # --- Temp file IPC ---
+                # stdout=PIPE is unreliable in windowed .exe (sys.stdout is None).
+                # A temp file is the simplest & most reliable cross-process signal.
+                signal_file = os.path.join(tempfile.gettempdir(), 'captain_orb_restore.tmp')
+                try:
+                    if os.path.exists(signal_file):
+                        os.remove(signal_file)
+                except Exception:
+                    pass
+
+                if window:
+                    window.hide()
+
+                # Build command
                 if getattr(sys, 'frozen', False):
-                    # Running as a PyInstaller .exe — re-launch self with --orb flag
-                    cmd = [sys.executable, '--orb']
+                    # Frozen .exe — re-launch self with --orb flag + signal file path
+                    cmd = [sys.executable, '--orb', signal_file]
                 else:
-                    # Running as plain Python in dev mode
-                    orb_script = os.path.join(os.path.dirname(__file__), "orb.py")
-                    cmd = [sys.executable, orb_script]
-                
+                    # Dev mode — launch orb.py directly
+                    orb_script = os.path.join(os.path.dirname(__file__), 'orb.py')
+                    cmd = [sys.executable, orb_script, signal_file]
+
+                kwargs = {}
+                if sys.platform == 'win32':
+                    kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+
+                log.info(f"[Orb] Launching: {cmd}")
                 self.orb_process = subprocess.Popen(
                     cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True,
-                    bufsize=1,
+                    stdin=subprocess.DEVNULL,
                     **kwargs
                 )
-                
+                log.info(f"[Orb] Process started with PID {self.orb_process.pid}")
+
                 def monitor_orb():
-                    try:
-                        for line in self.orb_process.stdout:
-                            if "RESTORE" in line:
-                                self.restore_main()
-                                break
-                    except Exception:
-                        pass
-                
-                threading.Thread(target=monitor_orb, daemon=True).start()
-                
+                    import time
+                    while True:
+                        time.sleep(0.3)
+                        # Check if restore was requested via signal file
+                        if os.path.exists(signal_file):
+                            try:
+                                os.remove(signal_file)
+                            except Exception:
+                                pass
+                            log.info("[Orb] Restore signal received")
+                            self.restore_main()
+                            break
+                        # Check if orb process exited (crashed or closed)
+                        if self.orb_process.poll() is not None:
+                            log.info(f"[Orb] Process exited (code {self.orb_process.returncode}) — restoring")
+                            self.restore_main()
+                            break
+
+                threading.Thread(target=monitor_orb, daemon=True, name="OrbMonitor").start()
+
             except Exception as e:
-                log.error(f"Failed to launch orb: {e}")
+                log.error(f"[Orb] Failed to launch orb: {e}")
+                # Always restore the window if orb fails to launch
+                try:
+                    if window:
+                        window.show()
+                except Exception:
+                    pass
 
         def restore_main(self):
             try:
                 if self.orb_process:
-                    self.orb_process.terminate()
+                    try:
+                        self.orb_process.terminate()
+                    except Exception:
+                        pass
                     self.orb_process = None
                 if window:
                     window.show()
+                    log.info("[Orb] Main window restored")
             except Exception as e:
-                log.error(f"Failed to restore from orb: {e}")
+                log.error(f"[Orb] Failed to restore main window: {e}")
 
     api_instance = WindowAPI()
 

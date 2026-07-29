@@ -31,10 +31,12 @@ def run_app():
     # init_environment() redirects sys.stdout to a log file, which would
     # break the stdout pipe used by the parent process to detect RESTORE signal.
     if len(sys.argv) > 1 and sys.argv[1] == '--orb':
+        # signal_file path is passed as argv[2] for cross-process restore signal
+        signal_file = sys.argv[2] if len(sys.argv) > 2 else None
         from PyQt6.QtWidgets import QApplication
         from core.orb import OrbWindow
         app = QApplication(sys.argv)
-        orb = OrbWindow()
+        orb = OrbWindow(signal_file=signal_file)
         orb.show()
         sys.exit(app.exec())
 

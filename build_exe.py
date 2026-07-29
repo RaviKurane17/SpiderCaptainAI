@@ -14,7 +14,6 @@ args = [
     '--windowed',              # Hide the console window
     '--noconfirm',             # Overwrite existing build
     '--icon=icon.ico',         # Custom Application Icon
-    '--splash=splash.png',     # Instant splash screen
 ]
 
 # Hidden imports (libraries that use dynamic importing)
