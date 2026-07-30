@@ -7,6 +7,7 @@ class OrbWindow(QWidget):
     def __init__(self, signal_file=None):
         super().__init__()
         self.signal_file = signal_file
+        self.logged_error = False
 
         # Window configuration — truly transparent, always on top, no taskbar entry
         self.setWindowFlags(
@@ -43,7 +44,7 @@ class OrbWindow(QWidget):
         # 30ms timer (~33 FPS) — uses hardware-accelerated native drawing, very low CPU
         self.anim_timer = QTimer(self)
         self.anim_timer.timeout.connect(self.update_animation)
-        self.anim_timer.start(30)
+        # Timer is started only when SHOW is received
         
         # State polling timer for IPC
         self.state_file = signal_file
@@ -67,11 +68,16 @@ class OrbWindow(QWidget):
                 
             if state == "SHOW" and self.current_state != "SHOW":
                 self.show()
+                self.anim_timer.start(30)
                 self.current_state = "SHOW"
             elif state == "HIDE" and self.current_state != "HIDE":
                 self.hide()
+                self.anim_timer.stop()
                 self.current_state = "HIDE"
             elif state == "EXIT":
+                self.anim_timer.stop()
+                self.state_timer.stop()
+                self.close()
                 QApplication.quit()
         except Exception:
             pass
@@ -129,11 +135,13 @@ class OrbWindow(QWidget):
             painter.drawEllipse(center, int(core_radius), int(core_radius))
             
         except Exception as e:
-            try:
-                with open("orb_crash.txt", "w") as f:
-                    f.write(str(e))
-            except Exception:
-                pass
+            if not self.logged_error:
+                self.logged_error = True
+                try:
+                    with open("orb_crash.txt", "w") as f:
+                        f.write(str(e))
+                except Exception:
+                    pass
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -150,11 +158,15 @@ class OrbWindow(QWidget):
         """Double-click writes 'RESTORE_MAIN' so main window restores."""
         if self.state_file:
             try:
-                with open(self.state_file, 'w') as f:
+                import os
+                tmp = self.state_file + ".new"
+                with open(tmp, 'w') as f:
                     f.write('RESTORE_MAIN')
+                os.replace(tmp, self.state_file)
             except Exception:
                 pass
         self.hide()
+        self.anim_timer.stop()
         self.current_state = "HIDE"
 
 if __name__ == '__main__':

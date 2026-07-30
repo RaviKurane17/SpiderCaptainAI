@@ -58,6 +58,18 @@ def _crash_recovery():
                 os.remove(f)
             except Exception:
                 pass
+    # 3. Kill lingering orb processes (they all poll this file)
+    import tempfile
+    import time
+    state_file = os.path.join(tempfile.gettempdir(), 'captain_orb_state.tmp')
+    try:
+        tmp = state_file + ".new"
+        with open(tmp, 'w') as f:
+            f.write('EXIT')
+        os.replace(tmp, state_file)
+        time.sleep(0.3)  # Give them time to read it and die
+    except Exception:
+        pass
 
     log.info("[Recovery] Crash recovery complete")
 
@@ -206,16 +218,23 @@ def start_ui():
     window = None
     orb_window = None
     class WindowAPI:
+        def _write_state(self, state_str):
+            try:
+                import os
+                tmp = self.state_file + ".new"
+                with open(tmp, 'w') as f:
+                    f.write(state_str)
+                os.replace(tmp, self.state_file)
+            except Exception:
+                pass
+
         def __init__(self):
             import os
             import tempfile
             self.orb_process = None
             self.state_file = os.path.join(tempfile.gettempdir(), 'captain_orb_state.tmp')
-            try:
-                with open(self.state_file, 'w') as f:
-                    f.write('HIDE')
-            except Exception:
-                pass
+            self._write_state('HIDE')
+            self.orb_restored = False
             
             self.preload_orb()
             threading.Thread(target=self.monitor_state, daemon=True, name="OrbMonitor").start()
@@ -257,8 +276,10 @@ def start_ui():
                             state = f.read().strip()
                         
                         if state == 'RESTORE_MAIN':
-                            log.info("[Orb] Restore signal received via state file")
-                            self.restore_main()
+                            if not getattr(self, 'orb_restored', False):
+                                self.orb_restored = True
+                                log.info("[Orb] Restore signal received via state file")
+                                self.restore_main()
                 except Exception:
                     pass
 
@@ -268,11 +289,7 @@ def start_ui():
                     self.preload_orb()
 
         def close(self):
-            try:
-                with open(self.state_file, 'w') as f:
-                    f.write('EXIT')
-            except Exception:
-                pass
+            self._write_state('EXIT')
             import os
             os._exit(0)
 
@@ -292,8 +309,8 @@ def start_ui():
 
         def orb_mode(self):
             try:
-                with open(self.state_file, 'w') as f:
-                    f.write('SHOW')
+                self.orb_restored = False
+                self._write_state('SHOW')
                 if window:
                     window.hide()
             except Exception as e:
@@ -302,8 +319,7 @@ def start_ui():
 
         def restore_main(self):
             try:
-                with open(self.state_file, 'w') as f:
-                    f.write('HIDE')
+                self._write_state('HIDE')
                 if window:
                     window.show()
                     window.restore()
