@@ -599,6 +599,12 @@ def _smart_search(params: dict, player=None, speak=None) -> str:
     extension = params.get("extension", None)
     path = params.get("path", "")
 
+    # Fallback if AI passed file name inside 'path' parameter
+    if not query and path and not (Path(path).is_absolute() or (len(path) >= 2 and path[1] == ":")):
+        if path.lower() not in {"desktop", "documents", "downloads", "home", "pictures", "videos", "music"}:
+            query = path
+            path = ""
+
     # If path looks like a drive letter, extract it
     if path and len(path) <= 3 and path[0].isalpha():
         drive = path[0].upper()
@@ -674,6 +680,12 @@ def _smart_open(params: dict, player=None, force_folder: bool = False, speak=Non
     name = params.get("name", "") or params.get("query", "")
     path = params.get("path", "")
     drive = params.get("drive", None)
+
+    # Fallback if AI passed file name inside 'path' parameter
+    if not name and path and not (Path(path).is_absolute() or (len(path) >= 2 and path[1] == ":")):
+        if path.lower() not in {"desktop", "documents", "downloads", "home", "pictures", "videos", "music"}:
+            name = path
+            path = ""
 
     # If a full absolute path is given, open directly
     if path and (Path(path).is_absolute() or (len(path) >= 2 and path[1] == ":")):

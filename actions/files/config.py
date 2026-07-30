@@ -28,6 +28,7 @@ SKIP_FOLDERS: frozenset[str] = frozenset({
     "windows", "windows.old",
     "programdata",
     "appdata",
+    "program files", "program files (x86)",
     ".git", ".svn", ".hg",
     "node_modules", "__pycache__", ".tox", ".nox",
     ".vs", ".idea", ".vscode",

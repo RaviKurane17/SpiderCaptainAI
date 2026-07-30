@@ -136,13 +136,13 @@ Do not call additional tools if the current tool already provides sufficient inf
      • browser interaction
 4. file_controller
    - Use for: File management (list, create, delete, move, copy, rename, read, write, search, open, open_folder, reveal, rebuild_index).
+   - IMPORTANT: For 'open', 'open_folder', and 'search', you MUST provide the target file or folder name in the `name` parameter. Do not put the file name in `path`.
    - Examples:
-     Open folder → action="open_folder"
-     Open file → action="open"
-     Search unknown location → action="search"
-     Delete file → action="delete"
-     Rename file → action="rename"
-     Limit search to a drive when specified.
+     Open a file/folder -> action="open", name="example"
+     Search for a file -> action="search", name="example"
+     Delete file -> action="delete", name="example"
+     Rename file -> action="rename", name="old_name", new_name="new_name"
+     Limit search to a drive when specified, e.g., drive="C".
 5. code_helper
    - Use for: Code writing/editing.
 6. screen_process
