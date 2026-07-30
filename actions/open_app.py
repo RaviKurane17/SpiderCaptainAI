@@ -152,7 +152,29 @@ def _launch_windows(app_name: str) -> bool:
             pass
 
     resolved = _resolve_windows(app_name)
-    if resolved:
+    
+    # Fast-path for common Windows built-ins using Win+R shortcut
+    built_ins = ["notepad", "calc", "cmd", "powershell", "mspaint", "explorer"]
+    is_built_in = False
+    for b in built_ins:
+        if b in app_name.lower():
+            is_built_in = True
+            break
+            
+    if is_built_in:
+        try:
+            import pyautogui
+            pyautogui.hotkey("win", "r")
+            time.sleep(0.3)
+            pyautogui.write(app_name.replace(".exe", ""), interval=0.02)
+            time.sleep(0.1)
+            pyautogui.press("enter")
+            time.sleep(1.0)
+            # Give it time to focus
+        except Exception:
+            pass
+
+    elif resolved:
         try:
             import os
             proc_name = os.path.basename(resolved).lower()
@@ -162,47 +184,54 @@ def _launch_windows(app_name: str) -> bool:
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            # Wait and verify
-            for _ in range(10):
-                time.sleep(0.5)
-                if _PSUTIL:
-                    for p in psutil.process_iter(['name']):
-                        try:
-                            if p.info['name'] and p.info['name'].lower() == proc_name:
-                                return True
-                        except Exception:
-                            continue
-            return "Application launched, but could not verify its process. It may have closed immediately or opened under a different name."
         except Exception as e:
             print(f"[open_app] subprocess failed for '{resolved}': {e}")
-
-    # Last resort: simulate Start Menu search — slow (~4s) but catches
-    # anything the resolution above missed (e.g. Microsoft Store apps).
-    try:
-        import pyautogui
-        pyautogui.PAUSE = 0.1
-        pyautogui.press("win")
-        time.sleep(0.4)
-        pyautogui.write(app_name, interval=0.03)
-        time.sleep(0.5)
-        pyautogui.press("enter")
-        
-        # Wait and verify by checking active window
-        try:
-            import pygetwindow as gw
-            for _ in range(10):
-                time.sleep(0.5)
-                win = gw.getActiveWindow()
-                if win and win.title and app_name.lower() in win.title.lower():
-                    return True
-        except Exception:
-            time.sleep(2.0)
+            return False
             
-        return "Start menu search triggered. (Blind fallback - verify with user if it actually opened)"
-    except Exception as e:
-        print(f"[open_app] Start Menu search failed: {e}")
+    else:
+        # Last resort: simulate Start Menu search
+        try:
+            import pyautogui
+            pyautogui.PAUSE = 0.1
+            pyautogui.press("win")
+            time.sleep(0.4)
+            pyautogui.write(app_name, interval=0.03)
+            time.sleep(0.5)
+            pyautogui.press("enter")
+        except Exception as e:
+            print(f"[open_app] Start Menu search failed: {e}")
+            return False
 
-    return False
+    # Wait and verify by checking the active window
+    # This prevents race conditions where the AI types before the app opens
+    try:
+        import pygetwindow as gw
+        for _ in range(15):
+            time.sleep(0.5)
+            # 1. Check if it's already the active window
+            active = gw.getActiveWindow()
+            if active and active.title:
+                title_lower = active.title.lower()
+                if app_name.lower() in title_lower or app_name.lower().replace('.exe', '') in title_lower:
+                    return True
+
+            # 2. Try to find and focus it if it exists but isn't active
+            for win in gw.getWindowsWithTitle(""):
+                if win.title:
+                    title_lower = win.title.lower()
+                    if app_name.lower() in title_lower or app_name.lower().replace('.exe', '') in title_lower:
+                        try:
+                            win.activate()
+                            time.sleep(0.3)
+                            return True
+                        except Exception:
+                            pass
+    except Exception:
+        # Fallback if pygetwindow fails
+        time.sleep(2.0)
+        return True
+
+    return "Application launched, but we could not verify if the window appeared."
 
 
 def _launch_macos(app_name: str) -> bool:

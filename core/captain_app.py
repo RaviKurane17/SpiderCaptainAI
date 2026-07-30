@@ -52,7 +52,7 @@ def _crash_recovery():
             pass
 
     # 2. Clean up temp screenshots/audio from a crash
-    for pattern in ["temp_screenshot*.png", "temp_screenshot*.jpg", "*.tmp"]:
+    for pattern in ["temp_screenshot*.png", "temp_screenshot*.jpg", "captain_orb_state*.tmp"]:
         for f in glob.glob(str(BASE_DIR / pattern)):
             try:
                 os.remove(f)
@@ -106,7 +106,7 @@ def _phase1_core(bridge):
 # ──────────────────────────────────────────────────────────────────────────
 #  Phase 2: Background Initialization (non-blocking)
 # ──────────────────────────────────────────────────────────────────────────
-def _phase2_background(bridge):
+def _phase2_background(stop_event, heartbeat, bridge):
     """
     Initialize services that can load while the user is already interacting.
     Runs in a background thread.
@@ -167,6 +167,10 @@ def start_ui():
     global window, orb_window
     import sys
     import os
+    import threading
+    import asyncio
+    import atexit
+    from core.lifecycle import get_lifecycle, RestartPolicy
 
     _set_startup_state(StartupState.STARTING)
 
@@ -179,38 +183,94 @@ def start_ui():
 
     # ── Phase 1: Critical Core (blocking) ──────────────────────────────
     _phase1_core(bridge)
+    
+    lm = get_lifecycle()
 
-    # ── Phase 2: Background Init (non-blocking) ───────────────────────
-    threading.Thread(target=_phase2_background, args=(bridge,),
-                     daemon=True, name="Phase2Init").start()
+    # ── Phase 2: Background Init (Managed) ─────────────────────────────
+    def phase2_wrapper(stop_event, heartbeat):
+        _phase2_background(stop_event, heartbeat, bridge)
 
-    # ── AI Session Runner ──────────────────────────────────────────────
-    def runner():
+    lm.register_service(
+        name="Phase2Init",
+        run_func=phase2_wrapper,
+        policy=RestartPolicy(restartable=False)
+    )
+
+    # ── AI Session Runner (Managed) ────────────────────────────────────
+    def runner_wrapper(stop_event, heartbeat):
         from core.live_session import CaptainLive
+        import traceback
+        
         captain = CaptainLive(bridge)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        task = loop.create_task(captain.run())
+        
+        async def monitor_stop():
+            while not stop_event.is_set():
+                heartbeat()
+                await asyncio.sleep(1.0)
+            task.cancel()
+            
+            # Await the main task to allow cleanup
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                log.error(f"[CaptainLive] Main task threw on cancel: {e}")
+                
+            # Collect and cancel orphaned tasks
+            pending = asyncio.all_tasks(loop)
+            # Remove our own monitor task from pending
+            pending = [t for t in pending if t != asyncio.current_task()]
+            for t in pending:
+                t.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
+            
+        monitor_task = loop.create_task(monitor_stop())
+        
         try:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            loop.run_until_complete(captain.run())
-        except KeyboardInterrupt:
-            log.info("\n🔴 Shutting down...")
-            try:
-                from utils import analytics as _analytics
-                _analytics.end_session()
-            except Exception:
-                pass
-            try:
-                from core.health import get_health_monitor
-                get_health_monitor().stop()
-            except Exception:
-                pass
-            try:
-                from core.maintenance import get_maintenance_daemon
-                get_maintenance_daemon().stop()
-            except Exception:
-                pass
+            loop.run_until_complete(monitor_task)
+        except Exception as e:
+            log.error(f"[CaptainLive] Run loop crashed:\\n{traceback.format_exc()}")
+            raise
+        finally:
+            loop.run_until_complete(loop.shutdown_asyncgens())
+            loop.close()
+            asyncio.set_event_loop(None)
 
-    threading.Thread(target=runner, daemon=True).start()
+    lm.register_service(
+        name="CaptainLive",
+        run_func=runner_wrapper,
+        policy=RestartPolicy(restartable=True, critical=True, max_retries=0) # 0 max_retries means infinite
+    )
+    
+    # ── Register Shutdown Hooks ────────────────────────────────────────
+    def _stop_analytics():
+        try:
+            from utils import analytics as _analytics
+            _analytics.end_session()
+        except Exception: pass
+        
+    def _stop_health():
+        try:
+            from core.health import get_health_monitor
+            get_health_monitor().stop()
+        except Exception: pass
+        
+    def _stop_maintenance():
+        try:
+            from core.maintenance import get_maintenance_daemon
+            get_maintenance_daemon().stop()
+        except Exception: pass
+
+    lm.register_shutdown_hook("Analytics", _stop_analytics)
+    lm.register_shutdown_hook("Health", _stop_health)
+    lm.register_shutdown_hook("Maintenance", _stop_maintenance)
+    atexit.register(lm.shutdown_all)
 
     # ── Launch pywebview ───────────────────────────────────────────────
     import webview
@@ -237,7 +297,12 @@ def start_ui():
             self.orb_restored = False
             
             self.preload_orb()
-            threading.Thread(target=self.monitor_state, daemon=True, name="OrbMonitor").start()
+            
+            lm.register_service(
+                name="OrbMonitor",
+                run_func=self.monitor_state,
+                policy=RestartPolicy(restartable=True, max_retries=0)
+            )
 
         def preload_orb(self):
             try:
@@ -265,54 +330,65 @@ def start_ui():
             except Exception as e:
                 log.error(f"[Orb] Failed to preload orb: {e}")
 
-        def monitor_state(self):
+        def monitor_state(self, stop_event, heartbeat):
             import time
             import os
-            while True:
+            last_mtime = 0
+            restart_count = 0
+            
+            while not stop_event.is_set():
+                heartbeat()
                 time.sleep(0.1)
                 try:
                     if os.path.exists(self.state_file):
-                        with open(self.state_file, 'r') as f:
-                            state = f.read().strip()
-                        
-                        if state == 'RESTORE_MAIN':
-                            if not getattr(self, 'orb_restored', False):
-                                self.orb_restored = True
-                                log.info("[Orb] Restore signal received via state file")
-                                self.restore_main()
+                        mtime = os.path.getmtime(self.state_file)
+                        if mtime != last_mtime:
+                            last_mtime = mtime
+                            with open(self.state_file, 'r') as f:
+                                state = f.read().strip()
+                            
+                            if state == 'RESTORE_MAIN':
+                                if not getattr(self, 'orb_restored', False):
+                                    self.orb_restored = True
+                                    log.info("[Orb] Restore signal received via state file")
+                                    self.restore_main()
                 except Exception:
                     pass
 
                 # Check if orb process crashed
                 if self.orb_process and self.orb_process.poll() is not None:
-                    log.info(f"[Orb] Process exited (code {self.orb_process.returncode}) — restarting in background")
+                    code = self.orb_process.returncode
+                    log.info(f"[Orb] Process exited (code {code}) — applying backoff")
+                    restart_count += 1
+                    backoff = min(1.0 * (2 ** (restart_count - 1)), 30.0)
+                    log.info(f"[Orb] Restart #{restart_count}, Waiting {backoff:.1f} sec...")
+                    
+                    if stop_event.wait(timeout=backoff):
+                        break
+                        
                     self.preload_orb()
 
         def close(self):
             self._write_state('EXIT')
+            lm.shutdown_all()
             import os
             os._exit(0)
 
         def minimize(self):
             try:
-                if window:
-                    window.minimize()
-            except Exception:
-                pass
+                if window: window.minimize()
+            except Exception: pass
 
         def maximize(self):
             try:
-                if window:
-                    window.toggle_fullscreen()
-            except Exception:
-                pass
+                if window: window.toggle_fullscreen()
+            except Exception: pass
 
         def orb_mode(self):
             try:
                 self.orb_restored = False
                 self._write_state('SHOW')
-                if window:
-                    window.hide()
+                if window: window.hide()
             except Exception as e:
                 log.error(f"[Orb] Failed to transition to orb mode: {e}")
                 self.restore_main()
@@ -323,7 +399,6 @@ def start_ui():
                 if window:
                     window.show()
                     window.restore()
-                    # Trick to force window to front on Windows
                     window.on_top = True
                     window.on_top = False
                     log.info("[Orb] Main window restored to foreground")
@@ -331,6 +406,9 @@ def start_ui():
                 log.error(f"[Orb] Failed to restore main window: {e}")
 
     api_instance = WindowAPI()
+    
+    # Start all managed services
+    lm.start_all()
 
     if getattr(sys, 'frozen', False):
         base_dir = sys._MEIPASS
@@ -348,7 +426,9 @@ def start_ui():
         frameless=True,
         js_api=api_instance
     )
-
+    
+    # Bind the pywebview closed event to our unified shutdown manager
+    window.events.closed += lm.shutdown_all
     
     try:
         import pyi_splash
@@ -357,3 +437,4 @@ def start_ui():
         pass
 
     webview.start()
+
