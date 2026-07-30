@@ -41,11 +41,40 @@ class OrbWindow(QWidget):
         self.rotation_angle = 0.0
         
         # 30ms timer (~33 FPS) — uses hardware-accelerated native drawing, very low CPU
-        self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_animation)
-        self.timer.start(30)
+        self.anim_timer = QTimer(self)
+        self.anim_timer.timeout.connect(self.update_animation)
+        self.anim_timer.start(30)
+        
+        # State polling timer for IPC
+        self.state_file = signal_file
+        self.current_state = "HIDE"
+        self.state_timer = QTimer(self)
+        self.state_timer.timeout.connect(self.check_state)
+        self.state_timer.start(100) # Check every 100ms
         
         self.drag_pos = None
+
+    def check_state(self):
+        if not self.state_file:
+            return
+        import os
+        if not os.path.exists(self.state_file):
+            return
+            
+        try:
+            with open(self.state_file, 'r') as f:
+                state = f.read().strip()
+                
+            if state == "SHOW" and self.current_state != "SHOW":
+                self.show()
+                self.current_state = "SHOW"
+            elif state == "HIDE" and self.current_state != "HIDE":
+                self.hide()
+                self.current_state = "HIDE"
+            elif state == "EXIT":
+                QApplication.quit()
+        except Exception:
+            pass
 
     def update_animation(self):
         self.pulse_radius += self.pulse_direction
@@ -118,22 +147,22 @@ class OrbWindow(QWidget):
         self.drag_pos = None
 
     def mouseDoubleClickEvent(self, event):
-        """Double-click writes a temp file signal to tell parent to restore the main window."""
-        if self.signal_file:
+        """Double-click writes 'RESTORE_MAIN' so main window restores."""
+        if self.state_file:
             try:
-                with open(self.signal_file, 'w') as f:
-                    f.write('RESTORE')
+                with open(self.state_file, 'w') as f:
+                    f.write('RESTORE_MAIN')
             except Exception:
                 pass
-        self.close()
+        self.hide()
+        self.current_state = "HIDE"
 
 if __name__ == '__main__':
     try:
-        # argv[1] = signal_file path (optional, used in both dev and frozen exe mode)
         signal_file = sys.argv[1] if len(sys.argv) > 1 else None
         app = QApplication(sys.argv)
+        # Orb launches hidden, waits for 'SHOW' signal
         orb = OrbWindow(signal_file=signal_file)
-        orb.show()
         sys.exit(app.exec())
     except Exception as e:
         try:

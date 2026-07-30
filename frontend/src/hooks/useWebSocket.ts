@@ -155,7 +155,7 @@ export function useWebSocket() {
                         setDiagnostics(data.data);
                     } else if (type === "startup_state") {
                         setStartupState(data.state);
-                    } else if (type === "notification") {
+                    } else if (type === "log") {
                         const entry = data.log;
                         if (!entry) return;
                         const who: string = entry.who;
@@ -171,6 +171,17 @@ export function useWebSocket() {
                             time: entry.time,
                             done: who === "CAPTAIN" && (entry.text as string).includes("Done"),
                         });
+                    } else if (type === "notification") {
+                        // System notifications — shown as SYSTEM log entries
+                        if (data.message) {
+                            appendLog({
+                                who: "SYSTEM",
+                                icon: Compass,
+                                color: "text-muted-foreground",
+                                text: data.message,
+                                time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                            });
+                        }
                     } else if (type === "chat_search_results") {
                         appendLog({
                             who: "SYSTEM",

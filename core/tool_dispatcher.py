@@ -135,18 +135,19 @@ TOOL_DECLARATIONS = [
         "name": "file_controller",
         "description": (
             "Manages files and folders. Actions: list, create_file, create_folder, delete, move, copy, rename, read, write, "
-            "search, open, open_folder, reveal, find, largest, disk_usage, organize_desktop, info, rebuild_index, index_stats. "
+            "search, open, open_folder, reveal, find, largest, disk_usage, organize_desktop, info, rebuild_index, index_stats, benchmark. "
             "For 'search' and 'open': set 'name' to the search term. Optionally set 'drive' to a letter like C, D, F to limit search to that drive. "
             "Set 'search_type' to 'file' or 'folder' to filter results. "
             "For 'open': if only 1 result is found, the file/folder is opened automatically. If multiple matches exist, a list is shown for the user to choose. "
             "Use 'open_folder' to explicitly search for and open a folder. "
             "Use 'reveal' to open the parent folder and highlight the item. "
-            "Use 'rebuild_index' to force re-scan of drives for faster future searches."
+            "Use 'rebuild_index' to force re-scan of drives for faster future searches. "
+            "Use 'benchmark' to run a speed test across all search providers for a given query."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action":      {"type": "STRING", "description": "list | create_file | create_folder | delete | move | copy | rename | read | write | search | open | open_folder | reveal | find | largest | disk_usage | organize_desktop | info | rebuild_index | index_stats"},
+                "action":      {"type": "STRING", "description": "list | create_file | create_folder | delete | move | copy | rename | read | write | search | open | open_folder | reveal | find | largest | disk_usage | organize_desktop | info | rebuild_index | index_stats | benchmark"},
                 "path":        {"type": "STRING", "description": "File/folder path or shortcut: desktop, downloads, documents, home. For search/open with a drive, use the drive letter like C or D."},
                 "destination": {"type": "STRING", "description": "Destination path for move/copy"},
                 "new_name":    {"type": "STRING", "description": "New name for rename"},
@@ -388,6 +389,25 @@ TOOL_DECLARATIONS = [
             "required": ["action"]
         }
     },
+    {
+        "name": "computer_use",
+        "description": "Performs intelligent GUI automation using screenshot analysis. Acts as an orchestration layer. Actions: click, double_click, right_click, move_mouse, drag, scroll, type, press_key, hotkey, wait, find_element, verify_element, describe_screen. Returns JSON with success/failure and reasons.",
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "click | double_click | right_click | move_mouse | drag | scroll | type | press_key | hotkey | wait | find_element | verify_element | describe_screen"},
+                "target_description": {"type": "STRING", "description": "Natural language description of the UI element to interact with"},
+                "text": {"type": "STRING", "description": "Text to type"},
+                "keys": {"type": "STRING", "description": "Key or hotkey to press"},
+                "x": {"type": "INTEGER", "description": "Optional explicit X coordinate (if not using vision)"},
+                "y": {"type": "INTEGER", "description": "Optional explicit Y coordinate (if not using vision)"},
+                "verify": {"type": "BOOLEAN", "description": "Capture a second screenshot to verify the action succeeded"},
+                "verify_description": {"type": "STRING", "description": "Explicit description of the expected UI state after the action (e.g. 'Is the login dialog open?')"},
+                "timeout": {"type": "NUMBER", "description": "Maximum time allowed for this automation in seconds."}
+            },
+            "required": ["action"]
+        }
+    }
 ]
 
 

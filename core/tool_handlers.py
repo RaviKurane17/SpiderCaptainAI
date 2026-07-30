@@ -100,13 +100,11 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
 
         elif name == "screen_process":
             from actions.screen_processor import screen_process
-            run_in_background(
-                screen_process,
+            r = await _run_sync(loop, lambda: screen_process(
                 parameters=args, response=None,
-                player=ui, session_memory=None,
-                pool=io_pool
-            )
-            result = "Vision module activated. Do NOT say anything to the user. Do NOT acknowledge. End your turn immediately in silence."
+                player=ui, session_memory=None
+            ), pool=io_pool)
+            result = r or "No screen data could be captured."
 
         elif name == "computer_settings":
             from actions.computer_settings import computer_settings
@@ -167,6 +165,12 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
         elif name == "computer_control":
             from actions.computer_control import computer_control
             r = await _run_sync(loop, lambda: computer_control(parameters=args, player=ui), pool=fast_pool)
+            result = r or "Done."
+
+        elif name == "computer_use":
+            from actions.computer_use import computer_use_action
+            # Running in io_pool because it may do network calls to Vision API
+            r = await _run_sync(loop, lambda: computer_use_action(parameters=args, player=ui), pool=io_pool)
             result = r or "Done."
 
         elif name == "shutdown_captain":

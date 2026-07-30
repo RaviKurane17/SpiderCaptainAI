@@ -154,14 +154,25 @@ def _launch_windows(app_name: str) -> bool:
     resolved = _resolve_windows(app_name)
     if resolved:
         try:
+            import os
+            proc_name = os.path.basename(resolved).lower()
             subprocess.Popen(
                 resolved,
                 shell=True,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
             )
-            time.sleep(1.5)
-            return True
+            # Wait and verify
+            for _ in range(10):
+                time.sleep(0.5)
+                if _PSUTIL:
+                    for p in psutil.process_iter(['name']):
+                        try:
+                            if p.info['name'] and p.info['name'].lower() == proc_name:
+                                return True
+                        except Exception:
+                            continue
+            return "Application launched, but could not verify its process. It may have closed immediately or opened under a different name."
         except Exception as e:
             print(f"[open_app] subprocess failed for '{resolved}': {e}")
 
@@ -175,7 +186,18 @@ def _launch_windows(app_name: str) -> bool:
         pyautogui.write(app_name, interval=0.03)
         time.sleep(0.5)
         pyautogui.press("enter")
-        time.sleep(1.0)
+        
+        # Wait and verify by checking active window
+        try:
+            import pygetwindow as gw
+            for _ in range(10):
+                time.sleep(0.5)
+                win = gw.getActiveWindow()
+                if win and win.title and app_name.lower() in win.title.lower():
+                    return True
+        except Exception:
+            time.sleep(2.0)
+            
         return "Start menu search triggered. (Blind fallback - verify with user if it actually opened)"
     except Exception as e:
         print(f"[open_app] Start Menu search failed: {e}")

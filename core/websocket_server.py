@@ -152,12 +152,22 @@ async def ws_handler(websocket, path=None):
         }))
         await websocket.send(json.dumps({
             "type": "muted",
-            "muted": bridge_instance.muted
+            "muted": getattr(bridge_instance, "muted", False)
         }))
         await websocket.send(json.dumps({
             "type": "volume_muted",
             "muted": getattr(bridge_instance, "volume_muted", False)
         }))
+        
+        # Sync the startup state immediately so the UI doesn't hang on 'STARTING'
+        try:
+            from core.captain_app import _current_state
+            await websocket.send(json.dumps({
+                "type": "startup_state",
+                "state": _current_state
+            }))
+        except ImportError:
+            pass
     
     try:
         async for message in websocket:
@@ -281,6 +291,47 @@ async def ws_handler(websocket, path=None):
                     }))
                 except Exception as e:
                     log.error(f"[WS SERVER] Error in get_files: {e}")
+
+            elif msg_type == "get_file_info_batch":
+                try:
+                    import os, time
+                    paths = data.get("paths", [])
+                    metadata = []
+                    for p in paths:
+                        if not os.path.exists(p):
+                            continue
+                        try:
+                            st = os.stat(p)
+                            is_dir = os.path.isdir(p)
+                            item_count = 0
+                            if is_dir:
+                                try:
+                                    item_count = len(os.listdir(p))
+                                except:
+                                    pass
+                            
+                            def format_size(b):
+                                for u in ["B", "KB", "MB", "GB"]:
+                                    if b < 1024: return f"{b:.1f} {u}"
+                                    b /= 1024
+                                return f"{b:.1f} TB"
+                                
+                            metadata.append({
+                                "path": p,
+                                "size": format_size(st.st_size),
+                                "modified": time.strftime('%Y-%m-%d %H:%M', time.localtime(st.st_mtime)),
+                                "type": "Folder" if is_dir else "File",
+                                "item_count": item_count
+                            })
+                        except Exception:
+                            pass
+                            
+                    await websocket.send(json.dumps({
+                        "type": "file_info_batch_data",
+                        "metadata": metadata
+                    }))
+                except Exception as e:
+                    log.error(f"[WS SERVER] Error in get_file_info_batch: {e}")
 
             elif msg_type == "file_operation":
                 try:

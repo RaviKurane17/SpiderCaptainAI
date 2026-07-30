@@ -111,7 +111,8 @@ def seed_core_tools(conn):
         # Automation Tools
         ("auto_scheduler", "Task Scheduler", "Schedule recurring tasks", "Automation", "Administrator"),
         ("auto_workflow", "Workflow Engine", "Multi-step AI workflows", "Automation", "Developer"),
-        ("auto_reminder", "Reminder Engine", "Contextual user reminders", "Automation", "Normal User")
+        ("auto_reminder", "Reminder Engine", "Contextual user reminders", "Automation", "Normal User"),
+        ("computer_use", "Computer Use (Vision)", "AI vision-based GUI automation", "Automation", "Normal User")
     ]
     
     now = time.time()

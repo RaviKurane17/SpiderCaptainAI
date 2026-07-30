@@ -370,28 +370,45 @@ class CaptainLive:
                                     # Allow rapid repetition for computer_settings (e.g. volume up repeatedly)
                                     is_repeatable = fc.name in ["computer_settings"]
                                     
-                                    if not is_repeatable and call_sig in self._recent_tools and (now - self._recent_tools[call_sig]) < 6.0:
+                                    if not is_repeatable and call_sig in self._recent_tools and (now - self._recent_tools[call_sig]['time']) < 6.0:
                                         log.info(f"[CAPTAIN] ⏭️ Skipping duplicate tool call (barge-in protection): {fc.name}")
                                         from google.genai import types
+                                        cached_resp = self._recent_tools[call_sig].get('response', {"result": "Skipped duplicate"})
                                         fn_responses.append(types.FunctionResponse(
-                                            id=getattr(fc, 'id', None) or "", name=fc.name, response={"result": "Skipped duplicate"}
+                                            id=getattr(fc, 'id', None) or "", name=fc.name, response=cached_resp
                                         ))
                                         continue
-                                        
-                                    self._recent_tools[call_sig] = now
 
                                     fc_name = fc.name
                                     fc_args = dict(fc.args or {})
                                     log.info(f"[CAPTAIN] 📞 {fc_name}")
                                     self.ui.set_state(f"SEARCHING {fc_name.upper()}")
                                     
-                                    # Instant text feedback for heavy tasks to prevent "stuck" feeling
-                                    heavy_tools = ["web_search", "dev_agent", "file_controller", "computer_control", "screen_process"]
+                                    # Force Gemini's native voice to acknowledge heavy tasks first
+                                    heavy_tools = ["web_search", "dev_agent", "file_controller", "computer_control"]
                                     if fc_name in heavy_tools:
-                                        import random
-                                        phrases = ["Rukho abhi batata hu", "Ek minute check karta hu", "Dhoond raha hu boss"]
-                                        msg = random.choice(phrases)
-                                        self.ui.write_log(f"Captain: {msg}")
+                                        if not hasattr(self, '_acknowledged_tools'):
+                                            self._acknowledged_tools = {}
+                                        
+                                        # If this tool hasn't been acknowledged in the last 15 seconds, force an acknowledgment
+                                        if call_sig not in self._acknowledged_tools or (now - self._acknowledged_tools.get(call_sig, 0)) > 15.0:
+                                            self._acknowledged_tools[call_sig] = now
+                                            log.info(f"[CAPTAIN] 🛑 Forcing native voice acknowledgment for {fc_name}")
+                                            
+                                            from google.genai import types
+                                            # Return a system directive to make Gemini speak and then call the tool again
+                                            directive = (
+                                                "SYSTEM DIRECTIVE: Do not answer the user yet. "
+                                                "First, speak an acknowledgment aloud in Hindi/Hinglish (e.g. 'Ek minute check karta hu' or 'एक क्षण, मैं खोज रहा हूँ।'). "
+                                                "After speaking, you MUST immediately call this exact tool again to get the actual data."
+                                            )
+                                            fn_responses.append(types.FunctionResponse(
+                                                id=getattr(fc, 'id', None) or "", name=fc_name, response={"result": directive}
+                                            ))
+                                            continue
+
+                                    # We will store the full response in _recent_tools after execute_tool
+
                                     # Broadcast Tool Start
                                     tool_t0 = time.time()
                                     if hasattr(self.ui, 'broadcast'):
@@ -407,7 +424,7 @@ class CaptainLive:
                                         # Per-tool timeout policy
                                         _TOOL_TIMEOUTS = {
                                             "file_controller": 60.0,
-                                            "screen_process": 15.0,
+                                            "screen_process": 45.0,
                                             "weather_report": 10.0,
                                             "web_search": 20.0,
                                             "phone_agent": 15.0,
@@ -433,6 +450,11 @@ class CaptainLive:
                                             timeout=tool_timeout
                                         )
                                         fn_responses.append(fr)
+                                        # Cache the response for duplicate protection
+                                        self._recent_tools[call_sig] = {
+                                            'time': time.time(),
+                                            'response': fr.response
+                                        }
                                         
                                         # Broadcast Tool Success
                                         if hasattr(self.ui, 'broadcast'):
@@ -479,9 +501,12 @@ class CaptainLive:
                                             })
 
                                 try:
-                                    await self.session.send_tool_response(function_responses=fn_responses)
-                                    self.perf_state['resp_sent'] = time.perf_counter()
-                                    log.info(f"[PERF] 📨 [AI] Tool response sent in {self.perf_state['resp_sent'] - t0:.2f}s")
+                                    if fn_responses:
+                                        await self.session.send_tool_response(function_responses=fn_responses)
+                                        self.perf_state['resp_sent'] = time.perf_counter()
+                                        log.info(f"[PERF] 📨 [AI] Tool response sent in {self.perf_state['resp_sent'] - t0:.2f}s")
+                                    else:
+                                        log.info(f"[PERF] 📨 [AI] Tool response skipped (empty)")
                                 except Exception as e:
                                     log.error(f"[CAPTAIN] Error sending tool response: {e}")
 
