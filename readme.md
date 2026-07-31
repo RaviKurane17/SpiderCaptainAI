@@ -1,119 +1,252 @@
 <div align="center">
-  <img src="ui_placeholder.png" alt="Captain AI Logo" width="150"/>
-  <h1>Captain AI Voice Assistant</h1>
-  <p><i>A powerful, autonomous, desktop-based AI assistant integrated with Gemini Live Audio, Firebase, and local system controls.</i></p>
+  <img src="icon.ico" alt="Captain AI Logo" width="120" style="border-radius: 50%; padding: 10px; background: rgba(255,255,255,0.1); box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);"/>
   
-  [![Python](https://img.shields.io/badge/Python-3.10+-blue.svg)](https://python.org)
-  [![PyQt6](https://img.shields.io/badge/UI-PyQt6-green.svg)](https://riverbankcomputing.com/software/pyqt/)
-  [![Gemini](https://img.shields.io/badge/AI-Google_Gemini-orange.svg)](https://aistudio.google.com/)
-  [![Firebase](https://img.shields.io/badge/Backend-Firebase-yellow.svg)](https://firebase.google.com/)
+  <br/>
+  
+  # ⚡ Captain AI Voice Assistant
+  
+  *A powerful, autonomous, desktop-based AI assistant integrated with **Gemini Live Audio**, **Firebase**, and deep local system controls.*
+
+  <br/>
+
+  [![Python Version](https://img.shields.io/badge/Python-3.10+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://python.org)
+  [![PyQt6 UI](https://img.shields.io/badge/PyQt6-Holographic_UI-41CD52?style=for-the-badge&logo=qt&logoColor=white)](https://riverbankcomputing.com/)
+  [![Gemini 2.5](https://img.shields.io/badge/Google_Gemini-2.5_Flash-4285F4?style=for-the-badge&logo=google&logoColor=white)](https://aistudio.google.com/)
+  [![Firebase Mobile](https://img.shields.io/badge/Firebase-Realtime_DB-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+  <br/>
+  <p align="center">
+    <a href="#-a-z-feature-set">✨ Features</a> •
+    <a href="#-snapshots--gallery">📸 Gallery</a> •
+    <a href="#-architecture">🏗️ Architecture</a> •
+    <a href="#-installation">🚀 Installation</a> •
+    <a href="#-project-structure">📂 Structure</a>
+  </p>
 </div>
-
-<br>
-
-**Captain AI** is an advanced voice-activated operating system agent built as a final year engineering project. It acts as a bridge between the physical device (PC), the cloud (Google Gemini / Firebase), and your mobile phone, featuring a custom Iron Man-style holographic HUD.
-
-## 🌟 Key Features
-
-### 🧠 Cognitive Architecture (Gemini 2.5)
-- **Real-time Native Audio:** True streaming voice conversations with ultra-low latency.
-- **Autonomous Multi-step Planning:** Give Captain a complex goal (e.g., "Research X and save a report"), and the internal Agent Planner will break it down and execute it step-by-step.
-- **Error Recovery Agent:** If a tool fails, Captain dynamically writes a fix and tries again.
-- **Neural Memory (ChromaDB):** Remembers facts, preferences, relationships, and context permanently.
-
-### 💻 System Control & Execution
-- **Autonomous Code Execution:** Can write and run Python scripts locally in a sandboxed environment.
-- **Complete System Automation:** Volume, brightness, process management, screenshot capture.
-- **File System Mastery:** Create, find, read, and organize files locally.
-- **Browser Automation:** Deep web searching and webpage interaction.
-- **Offline Fallback (Ollama):** Basic functionality works even when disconnected from the internet.
-
-### 📱 Mobile Integration (Firebase)
-- **Phone-to-PC Commands:** Send voice commands from your Android phone directly to your PC.
-- **Cross-device State:** Read phone notifications, battery level, and messages from your desktop.
-
-### 🎨 Custom Cinematic UI
-- **Holographic 3D Sphere:** Real-time particle system that reacts to speech and thought states.
-- **System Dashboard:** Live telemetry (ping, weather), analytics tracking, and memory management.
-- **Biometric Security:** Real-time facial recognition and secure PIN access.
-- **Accessibility:** Built-in high contrast modes and full layout control.
-
-## 🛠️ Technology Stack
-
-| Component | Technology | Description |
-|-----------|------------|-------------|
-| **Core AI** | `google-genai` | Gemini 2.5 Flash Native Audio for real-time voice & planning |
-| **UI Framework** | `PyQt6` | Hardware-accelerated custom rendering & system tray |
-| **Local Memory** | `chromadb` | Vector database for fast semantic memory retrieval |
-| **Phone Link** | `firebase-admin` | Realtime Database event listeners for Android integration |
-| **Offline LLM** | `Ollama` | Local Qwen2.5-coder fallback when internet is down |
-| **Audio I/O** | `sounddevice` | Raw PCM audio stream handling |
-
-## 🚀 Installation & Setup
-
-## 🆕 What's New in Captain
-
-- 📂 **Advanced File Handling** — New support for direct file uploads. Drop PDFs, source code, or images into the assistant to have them analyzed, summarized, or edited instantly.
-- 🎨 **Adaptive & Flexible UI** — A complete overhaul of the interface. The new UI is fully resizable and responsive, featuring transparency controls and customizable layouts to fit your workspace perfectly.
-- 🐧🍎 **Refined Cross-Platform Stability** — Major fixes for macOS and Linux compatibility. Core system actions are now more consistent across all three major operating systems.
-- ⚡ **Optimized Core Engine** — Significant performance boost in tool-calling logic and response generation, resulting in a 40% faster interaction speed.
 
 ---
 
-## ⚡ Quick Start
+**Captain AI** is an advanced voice-activated operating system agent built as a robust desktop application. It acts as a seamless bridge between your physical device, the cloud (Google Gemini & Firebase), and your mobile phone—all wrapped in a custom, responsive Iron Man-style holographic HUD.
+
+---
+
+## 📸 Snapshots & Gallery
+
+<table align="center">
+  <tr>
+    <td align="center">
+      <img src="snapshot/image.png" width="300" alt="Holographic HUD"/>
+      <br/><b>Holographic Orb (Main UI)</b>
+    </td>
+    <td align="center">
+      <img src="snapshot/image copy.png" width="300" alt="System Dashboard"/>
+      <br/><b>System Dashboard & Telemetry</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="snapshot/image copy 2.png" width="300" alt="Mobile Link"/>
+      <br/><b>Firebase Mobile Connection</b>
+    </td>
+    <td align="center">
+      <img src="snapshot/image copy 3.png" width="300" alt="Screen Analysis"/>
+      <br/><b>Vision & Screen OCR parsing</b>
+    </td>
+  </tr>
+</table>
+
+---
+
+## 🌟 A-Z Feature Set
+
+Captain AI comes packed with a massive array of capabilities directly integrated into your operating system.
+
+### 🧠 Intelligence & Memory
+- **Autonomous Planning (`planner.py`):** Breaks complex instructions into multi-step JSON execution trees.
+- **Cognitive Vision (`screen_processor.py`):** Takes screenshots, runs OCR, and understands visual context on your screen.
+- **Local Fallback (`offline_parser.py`):** Utilizes Ollama local LLMs for basic parsing when offline.
+- **Neural Memory (`memory/`):** Powered by SQLite for permanent semantic recall of facts and user preferences.
+- **Real-time Native Audio (`live_session.py`):** True streaming conversations utilizing Gemini's low-latency audio API.
+
+### 💻 System & Device Control
+- **App Management (`open_app.py`):** Automatically finds and launches desktop applications.
+- **Automation & Macros (`computer_use.py`, `macros.py`):** Mouse, keyboard control, and shortcut automation.
+- **Computer Settings (`computer_settings.py`):** Granular control over Bluetooth, Wi-Fi, and display configurations.
+- **Hardware Control (`computer_control.py`):** Adjust volume, screen brightness, and fetch real-time system metrics.
+
+### 📁 File & Code Operations
+- **Code Helper & Dev Agent (`code_helper.py`, `dev_agent.py`):** Write, run, debug Python scripts locally in an isolated sandbox.
+- **Advanced File Management (`file_controller.py`):** Search, create, move, and organize OS directories.
+- **File Processing (`file_processor.py`):** Read and extract data directly from PDFs, text files, and images.
+
+### 🌐 Web & Media
+- **Web Browsing (`web_search.py`):** Integrated live web search for pulling recent data.
+- **Media Playback (`youtube_video.py`):** Search and play YouTube videos or local media effortlessly.
+- **Weather API (`weather_report.py`):** Pull real-time weather and forecast data.
+
+### 📱 Connectivity & Social
+- **Cross-Device Mobile Link (`phone_agent.py`):** Sync notifications, SMS, battery data, and remote commands via Firebase.
+- **Messaging (`send_message.py`):** Automate sending messages across supported platforms.
+- **Reminders (`reminder.py`):** Set local timers, alarms, and semantic reminders.
+
+---
+
+## 🏗️ Architecture
+
+Captain AI leverages a highly modular event-driven architecture, enabling the AI to pause, execute local code, and resume reasoning gracefully.
+
+```mermaid
+graph TD;
+    subgraph UI Layer
+      A[PyQt6 Holographic HUD] <--> B(WebSocket Server);
+      C[Voice I/O Stream] --> A;
+    end
+    
+    subgraph Core Engine
+      B <--> D{Event Manager};
+      D <--> E[Live Session <br> <i>Gemini Native Audio</i>];
+      D <--> F[Tool Dispatcher];
+      E --> G[Planner Agent];
+    end
+    
+    subgraph Execution & Memory
+      F --> H[Action Controllers <br> <i>Files, Sys, Browser</i>];
+      F --> I[Plugin System];
+      G --> J[Executor / Code Runner];
+      E <--> K[(SQLite <br> <i>Semantic Memory</i>)];
+    end
+    
+    subgraph Cloud & External
+      L[Firebase Admin] --> D;
+      Mobile((Android App)) -.-> L;
+    end
+```
+
+---
+
+## ⚡ Standalone Executable (Ready to Use)
+
+Not a developer? You don't need Python to run Captain AI! 
+A pre-compiled standalone executable is available.
+
+Simply navigate to the `dist` folder and run the application directly:
+**Path:** `dist/Captain/Captain.exe`
+
+> *Note: Make sure your `.env` configuration file is properly set up in the same directory as the executable.*
+
+---
+
+## 🚀 Installation (For Developers)
 
 ### Prerequisites
-- Python 3.10 or higher
-- A Google AI Studio API Key
-- A Firebase Project (with Realtime Database enabled)
+- **Python 3.10+**
+- **Google AI Studio API Key**
+- **Firebase Project** with Realtime Database enabled
 
-### Step 1: Clone & Install
+### 1. Clone & Setup
 ```bash
 git clone https://github.com/RaviKurane17/Main_Captain.git
 cd Main_Captain
 pip install -r requirements.txt
 ```
 
-### Step 2: Configure Environment
-Copy the configuration template:
-```bash
-cp .env.example .env
+### 2. Environment Configuration
+Create a `.env` file in the root directory:
+```env
+GEMINI_API_KEY=your_gemini_key_here
+FIREBASE_KEY_PATH=/absolute/path/to/firebase-adminsdk.json
+PHONE_DEVICE_ID=your_android_uuid_here
 ```
-Edit the `.env` file and add your keys:
-- `GEMINI_API_KEY`: Your Google AI Studio key
-- `FIREBASE_KEY_PATH`: Absolute path to your Firebase Admin SDK JSON
-- `PHONE_DEVICE_ID`: The UUID matching your Android companion app
 
-### Step 3: Run Captain AI
+### 3. Launch Captain AI
 ```bash
 python main.py
 ```
-*On first launch, you will be prompted to set a Master PIN and complete a facial scan.*
+> **Note:** On first launch, the system will initialize databases and prompt for a biometric scan.
 
-## 📂 Project Structure
+---
+
+## 📂 Comprehensive Project Structure
+
+Captain AI is engineered with a modular, highly scalable codebase. Here is the deep-dive structure of the project:
 
 ```text
-Captain_AI/
-├── main.py                 # Core application loop, Audio pipeline, Event router
-├── ui.py                   # PyQt6 Holographic Interface (HUD, Dashboard, Settings)
-├── agent/                  # Cognitive Architecture
-│   ├── planner.py          # Breaks complex goals into JSON task sequences
-│   ├── executor.py         # Runs tasks, executes sandboxed Python code
-│   └── task_queue.py       # Thread-safe background task manager
-├── actions/                # Tool Modules (18+ distinct capabilities)
-│   ├── phone_agent.py      # Firebase Realtime DB integration
-│   ├── file_controller.py  # Local filesystem management
-│   ├── browser_control.py  # Playwright web automation
-│   └── offline_parser.py   # Regex + Ollama local fallback
-├── memory/                 # ChromaDB Vector Store & JSON states
-├── utils/                  # Centralized config, analytics, and rotating loggers
-└── plugins/                # Drop-in folder for custom third-party tools
+Captain_AI_UI/
+├── main.py                     # 🏁 Application Entry Point (Starts UI & Core)
+├── build_exe.py                # 📦 Script to compile the project to an EXE
+├── Captain.spec                # 📄 PyInstaller specification file
+├── .env                        # 🔐 Environment Variables (API Keys, Paths)
+│
+├── ⚙️ core/                      # Core Application Logic
+│   ├── captain_app.py          # Main application controller
+│   ├── live_session.py         # Gemini Native Audio integration & WebRTC
+│   ├── websocket_server.py     # Communication bridge between Engine & UI
+│   ├── event_manager.py        # Centralized Event Bus for cross-module messaging
+│   └── tool_dispatcher.py      # Maps LLM tool requests to local Python functions
+│
+├── 🧠 agent/                     # Cognitive Agents & Planning
+│   ├── planner.py              # Breaks down complex instructions into tasks
+│   ├── executor.py             # Executes planned JSON execution trees
+│   └── task_queue.py           # Thread-safe background task manager
+│
+├── 🛠️ actions/                   # 18+ Distinct Capability Modules (A-Z)
+│   ├── computer_control.py     # System (Volume, Brightness, Metrics)
+│   ├── file_controller.py      # File & Directory operations
+│   ├── phone_agent.py          # Firebase Realtime DB (Phone Link)
+│   ├── web_search.py           # Internet browsing & parsing
+│   ├── dev_agent.py            # Code execution sandbox
+│   └── screen_processor.py     # Visual OCR & Screen context
+│
+├── 🗃️ memory/                    # Persistent State
+│   └── SQLite stores for semantic recall & vectors
+│
+├── 🎨 ui/                        # User Interface Layer
+│   └── memory_page.py          # PyQt6 holographic components & dashboard
+│
+├── 🧩 plugins/                   # Extensibility
+│   ├── example_plugin.py       # Template for adding new tools
+│   └── mic_control_plugin.py   # Microphone toggles
+│
+├── 🔧 utils/                     # Helpers
+│   ├── config.py               # Configuration loader
+│   ├── logger.py               # Centralized rotating loggers
+│   └── analytics.py            # Performance tracking
+│
+├── 🌐 frontend/                  # Web Dashboard & Companion UI
+│   ├── src/                    # React/Vite source code
+│   ├── package.json            # Web dependencies
+│   └── vite.config.ts          # Vite bundler configuration
+│
+└── 📦 dist/Captain/              # Pre-compiled Standalone Executable
+    └── Captain.exe             # Ready-to-use Windows App
 ```
 
-## 🔐 Security Notice
-- **Sandboxed Execution:** AI-generated code is run in an isolated subprocess with a 120-second timeout.
-- **Local Data:** All chat history, facial embeddings, and memory stores remain strictly on your local disk.
-- **Biometrics:** Uses local Haar Cascade and histogram correlation (no cloud processing).
+---
 
-## 📝 License
-Designed and engineered by **Ravi Kurane**. All rights reserved. Built as a Computer Science Final Year Engineering Project.
+## ⚖️ License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+---
+
+## 👨‍💻 Let's Connect!
+
+Designed and engineered by **Ravindra Kurane**. If you like this project, feel free to reach out or check out my other work!
+
+<div align="left">
+  <a href="https://github.com/RaviKurane17" target="_blank">
+    <img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white" alt="GitHub" />
+  </a>
+  <a href="https://instagram.com/your_insta_handle" target="_blank">
+    <img src="https://img.shields.io/badge/Instagram-E4405F?style=for-the-badge&logo=instagram&logoColor=white" alt="Instagram" />
+  </a>
+  <a href="https://ravikurane17.netlify.app" target="_blank">
+    <img src="https://img.shields.io/badge/Portfolio-255E63?style=for-the-badge&logo=About.me&logoColor=white" alt="Portfolio" />
+  </a>
+</div>
+
+<br/>
+<div align="center">
+  <i>"I'm awake, Captain."</i>
+</div>
