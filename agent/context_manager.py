@@ -86,16 +86,16 @@ def inject_context(params: Dict[str, Any], tool: str,
 
     if tool == "file_controller" and params_copy.get("action") in ("write", "create_file"):
         content = params_copy.get("content", "")
-        if not content or len(content) < 50:
-            all_results = [
-                v for v in step_results.values()
-                if v and isinstance(v, str) and len(v) > 100
-                and v not in ("Done.", "Completed.")
-            ]
-            if all_results:
-                combined = "\n\n---\n\n".join(all_results)
-                translated = translate_to_goal_language(combined, goal)
-                params_copy["content"] = translated
-                log.info("[Context] 💉 Injected + translated content")
+        # Remove the < 50 length check that caused hallucination when placeholder was used
+        all_results = [
+            v for v in step_results.values()
+            if v and isinstance(v, str) and len(v) > 100
+            and v not in ("Done.", "Completed.")
+        ]
+        if all_results:
+            combined = "\n\n---\n\n".join(all_results)
+            translated = translate_to_goal_language(combined, goal)
+            params_copy["content"] = translated
+            log.info("[Context] 💉 Injected + translated content")
 
     return params_copy

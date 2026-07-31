@@ -120,6 +120,13 @@ class Service:
                 self.state = ServiceState.FAILED
                 self.metrics.last_stop = time.time()
 
+    def force_restart(self):
+        """Forces the service to stop and marks it as FAILED so the supervisor restarts it."""
+        log.info(f"[Service] Forcing restart of {self.name}...")
+        self.stop()
+        with self._lock:
+            self.state = ServiceState.FAILED
+
 
 class EventBus:
     def __init__(self):

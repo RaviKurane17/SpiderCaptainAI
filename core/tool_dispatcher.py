@@ -50,7 +50,10 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "send_message",
-        "description": "Sends a text message via WhatsApp, Telegram, or other messaging platform.",
+        "description": (
+            "Sends a text message via WhatsApp, Telegram, or other messaging platform on the computer/desktop. "
+            "Do NOT use this if the user explicitly asks to send from their phone (use phone_agent instead)."
+        ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
@@ -375,7 +378,11 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "phone_agent",
-        "description": "Sends commands to the user's Android phone. Use this to check phone battery, get phone location, search phone contacts, make calls from the phone, send SMS from the phone, send WhatsApp messages from the phone, open apps on the phone, go to the home screen (close apps) on the phone, control media volume, control screen brightness, set alarms on the phone, read the phone's recent notifications, lock the phone screen, take a screenshot, open the notification panel, toggle the flashlight (torch), toggle bluetooth, toggle wifi, check the phone's system info (storage/ram), read the phone's current screen content, trigger a loud siren (find phone), make the phone speak text (tts), play specific media/music, copy text to the phone clipboard, read recent SMS messages, read recent call logs, take a picture using the phone's camera, write a note on the phone, capture a vision screenshot (vision_capture), auto click on screen text (auto_click), auto scroll the screen (auto_scroll), auto type text (auto_type), unlock the phone screen (unlock_screen), reply to a notification (reply_notification), perform a fast web search on the phone (web_search), or read voice commands sent from the phone (read_voice_commands). IMPORTANT: Do NOT use the PC's send_message or open_app tools if the user specifies 'on my phone'.",
+        "description": (
+            "Sends commands to the user's Android phone. Use this to check phone battery, get phone location, search phone contacts, make calls from the phone, send SMS from the phone, send WhatsApp messages from the phone, open apps on the phone, go to the home screen (close apps) on the phone, control media volume, control screen brightness, set alarms on the phone, read the phone's recent notifications, lock the phone screen, take a screenshot, open the notification panel, toggle the flashlight (torch), toggle bluetooth, toggle wifi, check the phone's system info (storage/ram), read the phone's current screen content, trigger a loud siren (find phone), make the phone speak text (tts), play specific media/music, copy text to the phone clipboard, read recent SMS messages, read recent call logs, take a picture using the phone's camera, write a note on the phone, capture a vision screenshot (vision_capture), auto click on screen text (auto_click), auto scroll the screen (auto_scroll), auto type text (auto_type), unlock the phone screen (unlock_screen), reply to a notification (reply_notification), perform a fast web search on the phone (web_search), or read voice commands sent from the phone (read_voice_commands). "
+            "CRITICAL: Do NOT use this tool for sending WhatsApp/Telegram messages UNLESS the user explicitly says 'on my phone', 'from my phone', or 'through phone'. If they don't explicitly mention the phone, use the 'send_message' tool instead. "
+            "IMPORTANT: Do NOT use the PC's send_message or open_app tools if the user DOES specify 'on my phone'."
+        ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
@@ -465,13 +472,20 @@ async def execute_tool_inner(fc, name, args, ui, speak_callback, speak_error_cal
         return await _do_save_memory(fc, args)
 
     from core.tool_handlers import dispatch_action
-    result = await dispatch_action(name, args, ui, speak_callback, speak_error_callback)
-    log.info(f"[CAPTAIN] 📤 {name} → {str(result)[:80]}")
-    return types.FunctionResponse(
-        id=fc.id, name=name,
-        response={"result": result}
-    )
-
+    try:
+        result = await dispatch_action(name, args, ui, speak_callback, speak_error_callback)
+        log.info(f"[CAPTAIN] 📤 {name} → {str(result)[:80]}")
+        return types.FunctionResponse(
+            id=fc.id, name=name,
+            response={"result": result}
+        )
+    except Exception as exc:
+        err_msg = f"Tool '{name}' failed: {exc}"
+        log.error(f"[CAPTAIN] ❌ {err_msg}")
+        return types.FunctionResponse(
+            id=getattr(fc, 'id', None) or "", name=name,
+            response={"error": err_msg}
+        )
 
 async def _do_save_memory(fc, args):
     """Inline save_memory handler (no extra import round-trip needed)."""

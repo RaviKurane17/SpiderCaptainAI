@@ -97,6 +97,16 @@ class WebSocketUIBridge:
     def set_state(self, state: str):
         self.state = state
         self.broadcast({"type": "state", "state": state})
+        
+        try:
+            import tempfile
+            import os
+            ai_state_file = os.path.join(tempfile.gettempdir(), 'captain_orb_ai_state.tmp')
+            with open(ai_state_file, 'w') as f:
+                f.write(state)
+        except Exception:
+            pass
+
         if self.original_ui:
             self.original_ui.set_state(state)
 
@@ -729,6 +739,18 @@ async def ws_handler(websocket, path=None):
                     val = data.get("value")
                     from core.settings_manager import update_setting
                     res = await asyncio.to_thread(update_setting, key, val)
+                    
+                    # If it's a setting that requires an AI session restart to apply:
+                    if key in ["voice_personality", "voice_selection", "voice_wake_word", 
+                               "ai_provider", "ai_model", "ai_temperature", 
+                               "ai_enable_tool_calling", "ai_enable_vision"]:
+                        from core.lifecycle import get_lifecycle
+                        lm = get_lifecycle()
+                        svc = lm.services.get("CaptainLive")
+                        if svc:
+                            log.info(f"[WS SERVER] Setting '{key}' changed. Forcing CaptainLive restart.")
+                            svc.force_restart()
+                            
                     await websocket.send(json.dumps({
                         "type": "setting_updated",
                         "result": res

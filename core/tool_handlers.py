@@ -209,8 +209,8 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
                 result = f"Unknown tool: {name}"
 
     except Exception as exc:
-        result = f"Tool '{name}' failed: {exc}"
         traceback.print_exc()
         speak_error_callback(name, exc)
+        raise  # Bubble up to dispatcher so it can be wrapped as {"error": ...}
 
     return result

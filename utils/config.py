@@ -158,6 +158,9 @@ def get_voice() -> str:
         if v:
             # Map friendly names to actual Gemini voices
             voice_map = {
+                "Professional": "Charon",
+                "Friendly": "Kore",
+                "Cyberpunk": "Fenrir",
                 "Jarvis": "Puck",
                 "Friday": "Aoede",
                 "Aoede": "Aoede",

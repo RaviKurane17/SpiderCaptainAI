@@ -53,9 +53,9 @@ def build_config(resumption_handle: str | None = None) -> 'types.LiveConnectConf
     now_ts = time.time()
     
     if _cached_sys_prompt is None or (now_ts - _last_cache_time) > 60.0:
-        memories = search_memories(limit=30)
+        memories = search_memories(limit=5)
         if memories:
-            lines = ["[WHAT YOU KNOW ABOUT THIS PERSON — use naturally, never recite like a list]"]
+            lines = ["[RECENT MEMORIES (May not be relevant to the current topic) — use naturally, never recite like a list]"]
             for m in memories:
                 lines.append(f"- {m.get('category', 'Note').title()} / {m.get('title', 'Fact')}: {m.get('summary', '')}")
             _cached_mem_str = "\n".join(lines) + "\n"

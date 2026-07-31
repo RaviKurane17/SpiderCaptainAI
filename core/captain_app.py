@@ -311,10 +311,10 @@ def start_ui():
                 import os
                 
                 if getattr(sys, 'frozen', False):
-                    cmd = [sys.executable, '--orb', self.state_file]
+                    cmd = [sys.executable, '--orb', self.state_file, str(os.getpid())]
                 else:
                     orb_script = os.path.join(os.path.dirname(__file__), 'orb.py')
-                    cmd = [sys.executable, orb_script, self.state_file]
+                    cmd = [sys.executable, orb_script, self.state_file, str(os.getpid())]
 
                 kwargs = {}
                 if sys.platform == 'win32':
@@ -381,8 +381,41 @@ def start_ui():
 
         def maximize(self):
             try:
-                if window: window.toggle_fullscreen()
-            except Exception: pass
+                if window: 
+                    if getattr(self, '_is_maximized', False):
+                        width = getattr(self, '_prev_w', 1360)
+                        height = getattr(self, '_prev_h', 720)
+                        x = getattr(self, '_prev_x', 100)
+                        y = getattr(self, '_prev_y', 100)
+                        window.resize(width, height)
+                        window.move(x, y)
+                        self._is_maximized = False
+                    else:
+                        self._prev_w = window.width
+                        self._prev_h = window.height
+                        self._prev_x = window.x
+                        self._prev_y = window.y
+                        
+                        import sys
+                        if sys.platform == 'win32':
+                            import ctypes
+                            from ctypes.wintypes import RECT
+                            user32 = ctypes.windll.user32
+                            rect = RECT()
+                            SPI_GETWORKAREA = 48
+                            user32.SystemParametersInfoW(SPI_GETWORKAREA, 0, ctypes.byref(rect), 0)
+                            
+                            width = rect.right - rect.left
+                            height = rect.bottom - rect.top
+                            
+                            window.move(rect.left, rect.top)
+                            window.resize(width, height)
+                        else:
+                            window.maximize()
+                            
+                        self._is_maximized = True
+            except Exception as e:
+                log.error(f"[Orb] Maximize error: {e}")
 
         def orb_mode(self):
             try:
@@ -421,7 +454,7 @@ def start_ui():
         url=frontend_url,
         width=1360,
         height=720,
-        min_size=(1100, 700),
+        min_size=(600, 400),
         background_color="#050a14",
         frameless=True,
         js_api=api_instance
@@ -429,6 +462,49 @@ def start_ui():
     
     # Bind the pywebview closed event to our unified shutdown manager
     window.events.closed += lm.shutdown_all
+    
+    def on_shown():
+        try:
+            import sys
+            if sys.platform == 'win32':
+                import win32gui
+                import win32con
+                
+                hwnd = win32gui.FindWindow(None, "Captain AI")
+                if hwnd:
+                    style = win32gui.GetWindowLong(hwnd, win32con.GWL_STYLE)
+                    # Add WS_THICKFRAME to restore edge dragging for resize
+                    win32gui.SetWindowLong(hwnd, win32con.GWL_STYLE, style | win32con.WS_THICKFRAME)
+                    win32gui.SetWindowPos(hwnd, 0, 0, 0, 0, 0, win32con.SWP_NOMOVE | win32con.SWP_NOSIZE | win32con.SWP_NOZORDER | win32con.SWP_FRAMECHANGED)
+        except Exception:
+            pass
+
+    window.events.shown += on_shown
+    
+    import threading
+    _resize_timer = None
+
+    def enforce_aspect_ratio(w, h):
+        try:
+            target_ratio = 1360 / 720
+            # Only snap if it's visibly distorted (e.g. > 5% off)
+            if h > 0:
+                current_ratio = w / h
+                if abs(current_ratio - target_ratio) > 0.05:
+                    expected_height = int(w / target_ratio)
+                    # Use invoke to safely execute on the main UI thread
+                    window.resize(w, expected_height)
+        except Exception as e:
+            log.error(f"Aspect ratio snap failed: {e}")
+
+    def on_resized(width, height):
+        nonlocal _resize_timer
+        if _resize_timer:
+            _resize_timer.cancel()
+        _resize_timer = threading.Timer(0.2, enforce_aspect_ratio, args=(width, height))
+        _resize_timer.start()
+
+    window.events.resized += on_resized
     
     try:
         import pyi_splash

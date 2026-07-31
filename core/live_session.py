@@ -88,7 +88,8 @@ class CaptainLive:
     def speak_error(self, tool_name: str, error: str):
         short = str(error)[:120]
         self.ui.write_log(f"ERR: {tool_name} — {short}")
-        self.speak(f"Sir, {tool_name} encountered an error. {short}")
+        # Removed self.speak(...) to avoid sending parallel user turns.
+        # The LLM will speak the error itself based on the {"error": ...} tool response.
 
     def _on_text_command(self, text: str):
         if not self.state["online"]:
@@ -351,8 +352,12 @@ class CaptainLive:
 
                                 for fc in tool_call.function_calls:
                                     # Dedup: Gemini 3.1 sometimes sends identical function calls twice.
+                                    import json
+                                    fc_args_dict = dict(fc.args or {})
+                                    stable_args_str = json.dumps(fc_args_dict, sort_keys=True)
+                                    
                                     # Fallback to hashing the name + args if id is missing or duplicate.
-                                    fc_id = getattr(fc, 'id', None) or f"{fc.name}_{str(fc.args)}"
+                                    fc_id = getattr(fc, 'id', None) or f"{fc.name}_{stable_args_str}"
                                     if fc_id in self._processed_fc_ids:
                                         log.info(f"[CAPTAIN] ⏭️ Skipping duplicate tool call: {fc.name} (id={fc_id[:20]})")
                                         continue
@@ -361,16 +366,16 @@ class CaptainLive:
                                     if len(self._processed_fc_ids) > 200:
                                         self._processed_fc_ids = set(list(self._processed_fc_ids)[-100:])
 
-                                    call_sig = f"{fc.name}_{str(fc.args).lower()}"
+                                    call_sig = f"{fc.name}_{stable_args_str}"
                                     if not hasattr(self, '_recent_tools'):
                                         self._recent_tools = {}
                                     
                                     now = time.time()
-                                    # Dedup across turns within a 6-second window to prevent barge-in echo loops
+                                    # Dedup across turns within a 15-second window to prevent barge-in echo loops
                                     # Allow rapid repetition for computer_settings (e.g. volume up repeatedly)
                                     is_repeatable = fc.name in ["computer_settings"]
                                     
-                                    if not is_repeatable and call_sig in self._recent_tools and (now - self._recent_tools[call_sig]['time']) < 6.0:
+                                    if not is_repeatable and call_sig in self._recent_tools and (now - self._recent_tools[call_sig]['time']) < 15.0:
                                         log.info(f"[CAPTAIN] ⏭️ Skipping duplicate tool call (barge-in protection): {fc.name}")
                                         from google.genai import types
                                         cached_resp = self._recent_tools[call_sig].get('response', {"result": "Skipped duplicate"})
@@ -380,7 +385,7 @@ class CaptainLive:
                                         continue
 
                                     fc_name = fc.name
-                                    fc_args = dict(fc.args or {})
+                                    fc_args = fc_args_dict
                                     log.info(f"[CAPTAIN] 📞 {fc_name}")
                                     self.ui.set_state(f"SEARCHING {fc_name.upper()}")
                                     
@@ -395,17 +400,10 @@ class CaptainLive:
                                             self._acknowledged_tools[call_sig] = now
                                             log.info(f"[CAPTAIN] 🛑 Forcing native voice acknowledgment for {fc_name}")
                                             
-                                            from google.genai import types
-                                            # Return a system directive to make Gemini speak and then call the tool again
-                                            directive = (
-                                                "SYSTEM DIRECTIVE: Do not answer the user yet. "
-                                                "First, speak an acknowledgment aloud in Hindi/Hinglish (e.g. 'Ek minute check karta hu' or 'एक क्षण, मैं खोज रहा हूँ।'). "
-                                                "After speaking, you MUST immediately call this exact tool again to get the actual data."
-                                            )
-                                            fn_responses.append(types.FunctionResponse(
-                                                id=getattr(fc, 'id', None) or "", name=fc_name, response={"result": directive}
-                                            ))
-                                            continue
+                                            # Send a brief UI notification/speech to acknowledge without tricking the LLM
+                                            self.ui.write_log(f"[SYS] Searching/processing {fc_name}...")
+                                            # We don't use self.speak() here because it would send a turn to Gemini.
+                                            # We just let it run. The frontend can play a chime if needed.
 
                                     # We will store the full response in _recent_tools after execute_tool
 
@@ -436,7 +434,7 @@ class CaptainLive:
                                             "desktop_control": 5.0,
                                             "reminder": 5.0,
                                             "youtube_video": 15.0,
-                                            "send_message": 10.0,
+                                            "send_message": 25.0,
                                             "save_memory": 5.0,
                                             "search_memory": 10.0,
                                             "file_processor": 30.0,
@@ -468,7 +466,7 @@ class CaptainLive:
                                             
                                     except asyncio.TimeoutError:
                                         from google.genai import types
-                                        err_msg = "Task timed out after 18 seconds and was cancelled."
+                                        err_msg = f"Task timed out after {tool_timeout} seconds and was cancelled."
                                         log.error(f"[CAPTAIN] ⏱️ Tool {fc_name} timed out.")
                                         fn_responses.append(types.FunctionResponse(
                                             id=getattr(fc, 'id', None) or "", name=fc_name, response={"error": err_msg}

@@ -4,9 +4,10 @@ from PyQt6.QtCore import Qt, QTimer, QPoint
 from PyQt6.QtGui import QPainter, QColor, QRadialGradient, QBrush, QPen
 
 class OrbWindow(QWidget):
-    def __init__(self, signal_file=None):
+    def __init__(self, signal_file=None, parent_pid=None):
         super().__init__()
         self.signal_file = signal_file
+        self.parent_pid = parent_pid
         self.logged_error = False
 
         # Window configuration — truly transparent, always on top, no taskbar entry
@@ -38,8 +39,11 @@ class OrbWindow(QWidget):
         
         # Animation parameters
         self.pulse_radius = 45.0
-        self.pulse_direction = 0.5
+        self.pulse_direction = 1.0
         self.rotation_angle = 0.0
+        self.rotation_speed = 2.0
+        self.pulse_speed = 0.5
+        self.ai_state = "LISTENING"
         
         # 30ms timer (~33 FPS) — uses hardware-accelerated native drawing, very low CPU
         self.anim_timer = QTimer(self)
@@ -55,7 +59,53 @@ class OrbWindow(QWidget):
         
         self.drag_pos = None
 
+    def set_ai_state(self, state):
+        if self.ai_state == state: return
+        self.ai_state = state
+        
+        if state == "MUTED":
+            # More faint/lighter
+            self.aura_c1 = QColor(255, 180, 0, 50)
+            self.aura_c2 = QColor(255, 120, 0, 20)
+            self.core_c1 = QColor(255, 200, 150, 150)
+            self.core_c2 = QColor(255, 180, 50, 100)
+            self.core_c3 = QColor(255, 180, 0, 40)
+            self.web_pen = QPen(QColor(255, 180, 0, 40), 1)
+            self.rotation_speed = 0.5
+            self.pulse_speed = 0.2
+        elif state == "SPEAKING":
+            # Brighter, lighter, energetic
+            self.aura_c1 = QColor(0, 255, 255, 255)
+            self.aura_c2 = QColor(0, 200, 255, 180)
+            self.core_c1 = QColor(255, 255, 255, 255)
+            self.core_c2 = QColor(150, 255, 255, 255)
+            self.core_c3 = QColor(0, 255, 255, 220)
+            self.web_pen = QPen(QColor(0, 255, 255, 150), 2)
+            self.rotation_speed = 7.0
+            self.pulse_speed = 1.8
+        else:
+            self.aura_c1 = QColor(0, 255, 255, 200)
+            self.aura_c2 = QColor(0, 85, 255, 120)
+            self.core_c1 = QColor(255, 255, 255, 255)
+            self.core_c2 = QColor(200, 255, 255, 255)
+            self.core_c3 = QColor(0, 255, 255, 100)
+            self.web_pen = QPen(QColor(255, 255, 255, 80), 1)
+            self.rotation_speed = 2.0
+            self.pulse_speed = 0.5
+
     def check_state(self):
+        if self.parent_pid:
+            import psutil
+            try:
+                if not psutil.pid_exists(int(self.parent_pid)):
+                    self.anim_timer.stop()
+                    self.state_timer.stop()
+                    self.close()
+                    QApplication.quit()
+                    return
+            except Exception:
+                pass
+
         if not self.state_file:
             return
         import os
@@ -82,14 +132,24 @@ class OrbWindow(QWidget):
         except Exception:
             pass
 
+        import tempfile
+        ai_state_file = os.path.join(tempfile.gettempdir(), 'captain_orb_ai_state.tmp')
+        if os.path.exists(ai_state_file):
+            try:
+                with open(ai_state_file, 'r') as f:
+                    ai_state = f.read().strip()
+                self.set_ai_state(ai_state)
+            except Exception:
+                pass
+
     def update_animation(self):
-        self.pulse_radius += self.pulse_direction
-        if self.pulse_radius >= 55.0:
-            self.pulse_direction = -0.5
-        elif self.pulse_radius <= 40.0:
-            self.pulse_direction = 0.5
+        self.pulse_radius += (self.pulse_direction * self.pulse_speed)
+        if self.pulse_direction > 0 and self.pulse_radius >= 55.0:
+            self.pulse_direction = -1.0
+        elif self.pulse_direction < 0 and self.pulse_radius <= 40.0:
+            self.pulse_direction = 1.0
             
-        self.rotation_angle = (self.rotation_angle + 2.0) % 360.0
+        self.rotation_angle = (self.rotation_angle + self.rotation_speed) % 360.0
         self.update()
 
     def paintEvent(self, event):
@@ -172,9 +232,10 @@ class OrbWindow(QWidget):
 if __name__ == '__main__':
     try:
         signal_file = sys.argv[1] if len(sys.argv) > 1 else None
+        parent_pid = sys.argv[2] if len(sys.argv) > 2 else None
         app = QApplication(sys.argv)
         # Orb launches hidden, waits for 'SHOW' signal
-        orb = OrbWindow(signal_file=signal_file)
+        orb = OrbWindow(signal_file=signal_file, parent_pid=parent_pid)
         sys.exit(app.exec())
     except Exception as e:
         try:

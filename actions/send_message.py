@@ -134,11 +134,34 @@ def _search_in_app(query: str) -> None:
     _clear_and_paste(query)
     time.sleep(1.0)
 
+def _is_process_running(process_name: str) -> bool:
+    import psutil
+    process_name = process_name.lower()
+    for p in psutil.process_iter(['name']):
+        try:
+            name = p.info.get('name')
+            if name and process_name in name.lower():
+                return True
+        except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
+            pass
+    return False
+
 def _desktop_send(app_name: str, receiver: str, message: str) -> str:
+    was_running = False
+    if app_name.lower() == "whatsapp":
+        was_running = _is_process_running("whatsapp")
+        
     if not _open_app(app_name):
         return f"Could not open {app_name}."
 
-    time.sleep(1.0)
+    # WhatsApp sometimes takes a long time to load its UI if cold-started
+    if app_name.lower() == "whatsapp":
+        if was_running:
+            time.sleep(1.5) # Already open, should be fast
+        else:
+            time.sleep(8.0) # Cold start, wait for loading screen
+    else:
+        time.sleep(1.5)
     _search_in_app(receiver)
     pyautogui.press("enter")
     time.sleep(0.8)
