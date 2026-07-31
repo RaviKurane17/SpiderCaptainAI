@@ -36,22 +36,22 @@
 <table align="center">
   <tr>
     <td align="center">
-      <img src="snapshot/image.png" width="300" alt="Holographic HUD"/>
+      <img src="snapshot/image copy 3.png" width="300" alt="Holographic HUD"/>
       <br/><b>Holographic Orb (Main UI)</b>
     </td>
     <td align="center">
-      <img src="snapshot/image copy.png" width="300" alt="System Dashboard"/>
+      <img src="snapshot/image.png" width="300" alt="System Dashboard"/>
       <br/><b>System Dashboard & Telemetry</b>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="snapshot/image copy 2.png" width="300" alt="Mobile Link"/>
-      <br/><b>Firebase Mobile Connection</b>
+      <img src="snapshot/image copy.png" width="300" alt="Mobile Link"/>
+      <br/><b>ChatInterface</b>
     </td>
     <td align="center">
-      <img src="snapshot/image copy 3.png" width="300" alt="Screen Analysis"/>
-      <br/><b>Vision & Screen OCR parsing</b>
+      <img src="snapshot/image copy 2.png" width="300" alt="Screen Analysis"/>
+      <br/><b>Setting and Configurations</b>
     </td>
   </tr>
 </table>
