@@ -134,11 +134,20 @@ def _try_windows_start(url: str) -> bool:
 
 
 def _open_url(url: str) -> None:
-    """Open URL robustly, with fallbacks for PyInstaller --windowed executables."""
+    """Open URL robustly, prioritizing persistent Playwright."""
     import os
-    
     logger.info(f"Attempting to open URL: {url}")
     
+    try:
+        from actions.browser_agent import get_browser_manager, _PLAYWRIGHT_AVAILABLE
+        if _PLAYWRIGHT_AVAILABLE:
+            manager = get_browser_manager()
+            manager.open_url(url)
+            logger.info("Opened via Playwright Manager.")
+            return
+    except Exception as e:
+        logger.error(f"Playwright open failed: {e}")
+
     # 0. Prioritize Brave browser for YouTube playback
     if is_windows():
         brave_paths = [
@@ -512,11 +521,83 @@ def _handle_trending(parameters: Dict[str, Any], player: Any, speak: Any) -> str
 
     return result
 
+def _handle_media_control(parameters: Dict[str, Any], player: Any, action_type: str) -> str:
+    if player:
+        player.write_log(f"[YouTube] Media Control: {action_type}")
+
+    try:
+        from actions.browser_agent import get_browser_manager, _PLAYWRIGHT_AVAILABLE
+        if _PLAYWRIGHT_AVAILABLE:
+            manager = get_browser_manager()
+            if action_type in ("pause", "unpause", "play_pause"):
+                manager.execute_js("if(!document.querySelector('video').paused) { document.querySelector('video').pause(); } else { document.querySelector('video').play(); }")
+                return "Toggled play/pause."
+            elif action_type == "next":
+                manager.execute_js("document.querySelector('.ytp-next-button').click()")
+                return "Skipped to next track."
+            elif action_type == "previous":
+                manager.execute_js("window.history.back()")
+                return "Went back."
+            elif action_type == "seek_forward":
+                manager.execute_js("document.querySelector('video').currentTime += 20")
+                return "Skipped forward 20 seconds."
+            elif action_type == "seek_backward":
+                manager.execute_js("document.querySelector('video').currentTime -= 20")
+                return "Skipped backward 20 seconds."
+    except Exception as e:
+        logger.error(f"Playwright media control failed: {e}")
+        
+    try:
+        import pyautogui
+        import sys
+        import time
+        pyautogui.FAILSAFE = False
+    except ImportError:
+        return "pyautogui is required for media controls."
+    try:
+        if action_type in ("pause", "unpause", "play_pause"):
+            pyautogui.press("playpause")
+            return f"Toggled play/pause."
+        elif action_type == "next":
+            pyautogui.press("nexttrack")
+            return "Skipped to next track."
+        elif action_type == "previous":
+            pyautogui.press("prevtrack")
+            return "Skipped to previous track."
+        elif action_type in ("seek_forward", "seek_backward"):
+            if sys.platform == "win32":
+                import pygetwindow as gw
+                windows = gw.getWindowsWithTitle("YouTube") or gw.getWindowsWithTitle("Brave") or gw.getWindowsWithTitle("Chrome")
+                if windows:
+                    try:
+                        windows[0].activate()
+                        time.sleep(0.2)
+                    except:
+                        pass
+            if action_type == "seek_forward":
+                # press 'l' twice (10s skip * 2 = 20s)
+                pyautogui.press("l", presses=2)
+                return "Skipped forward 20 seconds."
+            else:
+                # press 'j' twice (10s back * 2 = 20s)
+                pyautogui.press("j", presses=2)
+                return "Skipped backward 20 seconds."
+    except Exception as e:
+        return f"Media control failed: {e}"
+        
+    return f"Performed {action_type}"
+
 _ACTION_MAP = {
     "play":      _handle_play,
     "summarize": _handle_summarize,
     "get_info":  _handle_get_info,
     "trending":  _handle_trending,
+    "pause":     lambda p, pl, sp: _handle_media_control(p, pl, "pause"),
+    "unpause":   lambda p, pl, sp: _handle_media_control(p, pl, "unpause"),
+    "next":      lambda p, pl, sp: _handle_media_control(p, pl, "next"),
+    "previous":  lambda p, pl, sp: _handle_media_control(p, pl, "previous"),
+    "seek_forward": lambda p, pl, sp: _handle_media_control(p, pl, "seek_forward"),
+    "seek_backward": lambda p, pl, sp: _handle_media_control(p, pl, "seek_backward"),
 }
 
 

@@ -64,51 +64,12 @@ def _clear_and_paste(text: str) -> None:
     _paste_text(text)
 
 def _open_app(app_name: str) -> bool:
-    _require_pyautogui()
-    os_name = _get_os()
-
+    """Open an app using the main open_app module (unified, robust launcher)."""
     try:
-        if os_name == "windows":
-            pyautogui.press("win")
-            time.sleep(0.5)
-            _paste_text(app_name)
-            time.sleep(0.6)
-            pyautogui.press("enter")
-            time.sleep(2.5)
-            return True
-
-        elif os_name == "mac":
-            result = subprocess.run(
-                ["open", "-a", app_name],
-                capture_output=True, text=True, timeout=10,
-            )
-            if result.returncode != 0:
-                result = subprocess.run(
-                    ["open", "-a", f"{app_name}.app"],
-                    capture_output=True, text=True, timeout=10,
-                )
-            time.sleep(2.5)
-            return result.returncode == 0
-
-        else: 
-            launched = False
-            for launcher in [
-                ["gtk-launch", app_name.lower()],
-                [app_name.lower()],
-            ]:
-                try:
-                    subprocess.Popen(
-                        launcher,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                    )
-                    launched = True
-                    break
-                except FileNotFoundError:
-                    continue
-            time.sleep(2.5)
-            return launched
-
+        from actions.open_app import open_app
+        result = open_app(parameters={"app_name": app_name}, response=None, player=None)
+        time.sleep(1.5)
+        return result is not None and "error" not in (result or "").lower()
     except Exception as e:
         print(f"[SendMessage] ⚠️ Could not open {app_name}: {e}")
         return False

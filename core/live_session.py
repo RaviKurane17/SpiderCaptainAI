@@ -68,7 +68,10 @@ class CaptainLive:
         self._tool_tasks: set[asyncio.Task] = set()
         # Dedup guard: Gemini 3.1 may emit the same tool_call event twice.
         # Track processed function-call IDs so we never execute one twice.
-        self._processed_fc_ids: set[str] = set()
+        # WHY OrderedDict: unlike a plain set, eviction is FIFO (oldest first),
+        # preventing a race where recently processed IDs are randomly dropped.
+        from collections import OrderedDict
+        self._processed_fc_ids: OrderedDict = OrderedDict()
         # Resumption handle from the Live API's session_resumption_update
         # messages. When set, reconnects RESUME the prior session instead
         # of cold-starting a brand-new one (see ai_service.build_config).
@@ -111,9 +114,15 @@ class CaptainLive:
         
         self.perf_state["last_cmd"] = text.strip()
         self.perf_state["cmd_start"] = time.time()
+        
+        # Automatically add the wake word to text commands so the AI doesn't
+        # ignore them as background noise due to the strict wake-word rules.
+        command_to_send = text
+        if "captain" not in text.lower():
+            command_to_send = f"Captain, {text}"
 
         asyncio.run_coroutine_threadsafe(
-            self.session.send(input=text, end_of_turn=True),
+            self.session.send(input=command_to_send, end_of_turn=True),
             self._loop
         )
 
@@ -179,13 +188,21 @@ class CaptainLive:
         def callback(indata, frames, time_info, status):
             with self._speaking_lock:
                 captain_speaking = self._is_speaking
-            if not captain_speaking and not self.ui.muted:
+            if not self.ui.muted:
                 data = indata.tobytes()
                 
+                # Helper to safely put into queue without crashing the event loop
+                def safe_put(item):
+                    try:
+                        self.out_queue.put_nowait(item)
+                    except asyncio.QueueFull:
+                        # Silently drop the frame if queue is full (network lagging behind mic)
+                        pass
+
                 # Local VAD — filter out background noise
                 import audioop
                 rms = audioop.rms(data, 2)
-                threshold = 800 # Voice threshold for 16-bit PCM (filters fans, typing, ambient)
+                threshold = 1500 # Voice threshold for 16-bit PCM (filters fans, typing, ambient)
                 
                 if not hasattr(self, '_pre_roll_buffer'):
                     import collections
@@ -196,26 +213,26 @@ class CaptainLive:
                         # Voice just started! Flush the pre-roll buffer so we don't chop the start of the word
                         while self._pre_roll_buffer:
                             loop.call_soon_threadsafe(
-                                self.out_queue.put_nowait,
+                                safe_put,
                                 {"data": self._pre_roll_buffer.popleft(), "mime_type": "audio/pcm;rate=16000"}
                             )
                     self._vad_speaking = True
                     self._vad_silence_chunks = 0
                 elif self._vad_speaking:
                     self._vad_silence_chunks += 1
-                    # ~3.0s of silence (45 chunks at 64ms/chunk)
-                    if self._vad_silence_chunks > 45:
+                    # ~2.5s of silence (39 chunks at 64ms/chunk)
+                    if self._vad_silence_chunks > 39:
                         self._vad_speaking = False
                         self._vad_silence_chunks = 0
                         loop.call_soon_threadsafe(
-                            self.out_queue.put_nowait,
+                            safe_put,
                             {"type": "turn_complete"}
                         )
                 
                 # If speaking, stream live audio. If not, save to pre-roll buffer.
                 if self._vad_speaking:
                     loop.call_soon_threadsafe(
-                        self.out_queue.put_nowait,
+                        safe_put,
                         {"data": data, "mime_type": "audio/pcm;rate=16000"}
                     )
                 else:
@@ -253,6 +270,14 @@ class CaptainLive:
                                 self.audio_in_queue.get_nowait()
                             except asyncio.QueueEmpty:
                                 break
+                                
+                        # Clear play thread's queue as well so TTS stops instantly
+                        if hasattr(self, 'audio_out_queue') and self.audio_out_queue:
+                            import queue as _queue
+                            while not self.audio_out_queue.empty():
+                                try: self.audio_out_queue.get_nowait()
+                                except _queue.Empty: break
+                                
                         with self._speaking_lock:
                             self._is_speaking = False
                         self.ui.set_state("LISTENING")
@@ -361,10 +386,10 @@ class CaptainLive:
                                     if fc_id in self._processed_fc_ids:
                                         log.info(f"[CAPTAIN] ⏭️ Skipping duplicate tool call: {fc.name} (id={fc_id[:20]})")
                                         continue
-                                    self._processed_fc_ids.add(fc_id)
-                                    # Cap the set size to prevent unbounded memory growth
-                                    if len(self._processed_fc_ids) > 200:
-                                        self._processed_fc_ids = set(list(self._processed_fc_ids)[-100:])
+                                    self._processed_fc_ids[fc_id] = True
+                                    # Cap the dict size — FIFO eviction (oldest first)
+                                    while len(self._processed_fc_ids) > 200:
+                                        self._processed_fc_ids.popitem(last=False)
 
                                     call_sig = f"{fc.name}_{stable_args_str}"
                                     if not hasattr(self, '_recent_tools'):
@@ -428,7 +453,7 @@ class CaptainLive:
                                             "phone_agent": 15.0,
                                             "dev_agent": 45.0,
                                             "code_helper": 30.0,
-                                            "open_app": 10.0,
+                                            "open_app": 30.0,
                                             "computer_settings": 5.0,
                                             "computer_control": 10.0,
                                             "desktop_control": 5.0,
@@ -522,7 +547,7 @@ class CaptainLive:
         import sounddevice as sd
         import queue as _queue
 
-        audio_q: _queue.Queue = _queue.Queue(maxsize=500)
+        self.audio_out_queue = _queue.Queue(maxsize=500)
         writer_ready = threading.Event()
 
         def _writer():
@@ -538,28 +563,37 @@ class CaptainLive:
             try:
                 import ctypes
                 handle = ctypes.windll.kernel32.GetCurrentThread()
-                ctypes.windll.kernel32.SetThreadPriority(handle, 2)
+                # 15 is THREAD_PRIORITY_TIME_CRITICAL in Windows
+                ctypes.windll.kernel32.SetThreadPriority(handle, 15)
             except Exception:
                 pass
 
             silence = b'\x00' * (CHUNK_SIZE * CHANNELS * 2)
             try:
                 while True:
-                    chunk = audio_q.get()      # blocks cleanly, 0% CPU when idle
-                    if chunk is None:
-                        break                  # poison pill → graceful shutdown
                     try:
+                        chunk = self.audio_out_queue.get(timeout=0.05)
+                        if chunk is None:
+                            break                  # poison pill → graceful shutdown
+                        
                         if getattr(self.ui, "volume_muted", False):
                             stream.write(silence)
                         else:
                             stream.write(chunk)
+                    except _queue.Empty:
+                        # Anti-stutter: If network lags and queue empties, write silence 
+                        # to keep the sounddevice DAC buffer full and prevent underrun crashes.
+                        stream.write(silence)
                     except Exception as e:
                         log.warning(f"[CAPTAIN] ⚠️ Audio chunk dropped: {e}")
             finally:
                 stream.stop()
                 stream.close()
 
-        run_in_background(_writer)
+        # Spawn a dedicated daemon thread for audio playback so we don't
+        # starve the bounded thread pools with a while-True loop.
+        import threading as _t
+        _t.Thread(target=_writer, daemon=True).start()
         writer_ready.wait()
 
         idle_time = 0.0
@@ -572,7 +606,7 @@ class CaptainLive:
                 except asyncio.TimeoutError:
                     idle_time += 0.08
                     if idle_time > 0.4:
-                        if audio_q.empty():
+                        if self.audio_out_queue.empty():
                             self.set_speaking(False)
                             if self._turn_done_event and self._turn_done_event.is_set():
                                 self._turn_done_event.clear()
@@ -590,14 +624,14 @@ class CaptainLive:
 
                 self.set_speaking(True)
                 try:
-                    audio_q.put_nowait(chunk)
+                    self.audio_out_queue.put_nowait(chunk)
                 except _queue.Full:
                     try:
-                        audio_q.get_nowait()
+                        self.audio_out_queue.get_nowait()
                     except _queue.Empty:
                         pass
                     try:
-                        audio_q.put_nowait(chunk)
+                        self.audio_out_queue.put_nowait(chunk)
                     except _queue.Full:
                         pass
         except Exception as exc:
@@ -605,7 +639,7 @@ class CaptainLive:
             raise
         finally:
             self.set_speaking(False)
-            audio_q.put(None)   # poison pill stops writer thread
+            self.audio_out_queue.put(None)   # poison pill stops writer thread
 
     async def run(self):
         run_in_background(monitor_connection, self.state, self.speak, self.ui)
@@ -668,7 +702,7 @@ class CaptainLive:
                         self._loop            = asyncio.get_running_loop()
                         self.audio_in_queue   = asyncio.Queue()
                         self._turn_done_event = asyncio.Event()
-                        # Clear dedup set on reconnect — new session means new IDs
+                        # Clear dedup dict on reconnect — new session means new IDs
                         self._processed_fc_ids.clear()
 
                         connected_at = time.perf_counter()

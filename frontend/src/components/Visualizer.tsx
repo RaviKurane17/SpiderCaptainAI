@@ -32,7 +32,7 @@ const Orb3DCanvas = React.memo(function Orb3DCanvas({ aiState }: OrbProps) {
         });
         resizeObserver.observe(canvas);
 
-        const numParticles = 750;
+        const numParticles = 250;
         const sphereRadius = 80;
         const focalLength = 210;
 
@@ -43,7 +43,7 @@ const Orb3DCanvas = React.memo(function Orb3DCanvas({ aiState }: OrbProps) {
             particles.push({ phi, theta, speedOffset: Math.random() * Math.PI * 2 });
         }
 
-        const numAmbient = 60;
+        const numAmbient = 15;
         const ambientParticles: { x: number; y: number; vx: number; vy: number; alpha: number; r: number }[] = [];
         for (let i = 0; i < numAmbient; i++) {
             const isLeft = Math.random() > 0.5;

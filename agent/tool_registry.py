@@ -1,7 +1,5 @@
 from typing import Callable, Optional, Dict, Any
 
-from agent.code_runner import run_generated_code
-
 def call_tool(tool: str, parameters: Dict[str, Any], speak: Optional[Callable]) -> str:
     if tool == "open_app":
         from actions.open_app import open_app
@@ -57,11 +55,8 @@ def call_tool(tool: str, parameters: Dict[str, Any], speak: Optional[Callable]) 
         return computer_control(parameters=parameters, player=None) or "Done."
 
     elif tool == "generated_code":
-        description = parameters.get("description", "")
-        if not description:
-            raise ValueError("generated_code requires a 'description' parameter.")
-        return run_generated_code(description, speak=speak)
+        # SAFETY: Do not execute arbitrary code. This tool was deprecated.
+        return f"Tool 'generated_code' is not available. Use code_helper instead."
 
     else:
-        print(f"[Executor] ⚠️ Unknown tool '{tool}' — falling back to generated_code")
-        return run_generated_code(f"Accomplish this task: {parameters}", speak=speak)
+        return f"Unknown tool '{tool}'. Available tools: open_app, web_search, file_controller, code_helper, dev_agent, screen_process, send_message, reminder, youtube_video, weather_report, computer_settings, desktop_control, computer_control."

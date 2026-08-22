@@ -154,7 +154,7 @@ class AgentExecutor:
                    speak: Callable | None) -> str:
         fallback = f"All done, sir. Completed {len(completed_steps)} steps for: {goal[:60]}."
         try:
-            model     = get_model(model_name="gemini-2.5-flash-lite")
+            model     = get_model(model_name="gemini-3.5-flash-lite")
             steps_str = "\n".join(f"- {s.get('description', '')}" for s in completed_steps)
             prompt    = (
                 f'User goal: "{goal}"\n'

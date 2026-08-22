@@ -277,7 +277,7 @@ def _analyze_image_rest(image_bytes: bytes, mime_type: str, user_text: str) -> s
     last_err = None
 
     if openrouter_api_key:
-        or_models = ["google/gemini-2.0-flash-exp:free", "google/gemini-exp-1206:free", "google/gemini-2.5-flash", "meta-llama/llama-3.2-90b-vision-instruct"]
+        or_models = ["google/gemini-2.5-pro", "google/gemini-2.5-flash", "meta-llama/llama-3.2-90b-vision-instruct"]
         for or_model in or_models:
             try:
                 print(f"[Vision] Sending image to OpenRouter ({or_model}) for analysis...")

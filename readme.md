@@ -65,24 +65,25 @@ Captain AI comes packed with a massive array of capabilities directly integrated
 ### 🧠 Intelligence & Memory
 - **Autonomous Planning (`planner.py`):** Breaks complex instructions into multi-step JSON execution trees.
 - **Cognitive Vision (`screen_processor.py`):** Takes screenshots, runs OCR, and understands visual context on your screen.
-- **Local Fallback (`offline_parser.py`):** Utilizes Ollama local LLMs for basic parsing when offline.
+- **Offline Mode (`offline_parser.py`):** Zero-dependency local command engine — handles 50+ hardcoded commands (media, files, hotkeys, system) instantly with no internet and zero CPU overhead.
 - **Neural Memory (`memory/`):** Powered by SQLite for permanent semantic recall of facts and user preferences.
 - **Real-time Native Audio (`live_session.py`):** True streaming conversations utilizing Gemini's low-latency audio API.
 
 ### 💻 System & Device Control
 - **App Management (`open_app.py`):** Automatically finds and launches desktop applications.
-- **Automation & Macros (`computer_use.py`, `macros.py`):** Mouse, keyboard control, and shortcut automation.
-- **Computer Settings (`computer_settings.py`):** Granular control over Bluetooth, Wi-Fi, and display configurations.
-- **Hardware Control (`computer_control.py`):** Adjust volume, screen brightness, and fetch real-time system metrics.
+- **Automation & Macros (`computer_use.py`, `computer_control.py`):** Mouse, keyboard, hotkeys (Ctrl+C/V, Win+R, Alt+Tab, etc.), clicking by visual description, and shortcut automation.
+- **Computer Settings (`computer_settings.py`):** Granular control over Bluetooth, Wi-Fi, dark mode, window management, and display configurations.
+- **Hardware Control:** Adjust volume, screen brightness, and fetch real-time system metrics (CPU/RAM/Battery).
 
 ### 📁 File & Code Operations
 - **Code Helper & Dev Agent (`code_helper.py`, `dev_agent.py`):** Write, run, debug Python scripts locally in an isolated sandbox.
-- **Advanced File Management (`file_controller.py`):** Search, create, move, and organize OS directories.
+- **Advanced File Management (`file_controller.py`):** Search, create, move, and organize OS directories with deep drive indexing.
 - **File Processing (`file_processor.py`):** Read and extract data directly from PDFs, text files, and images.
 
 ### 🌐 Web & Media
+- **Playwright AI Browser (`browser_agent.py`):** A persistent, stateful Playwright browser engine that runs in the background. Saves your login sessions across restarts.
+- **True Background Media Control:** Captain injects JavaScript directly into the Playwright browser — skip/pause/play YouTube even when the window is minimized or on a different monitor, with zero keyboard simulation.
 - **Web Browsing (`web_search.py`):** Integrated live web search for pulling recent data.
-- **Media Playback (`youtube_video.py`):** Search and play YouTube videos or local media effortlessly.
 - **Weather API (`weather_report.py`):** Pull real-time weather and forecast data.
 
 ### 📱 Connectivity & Social

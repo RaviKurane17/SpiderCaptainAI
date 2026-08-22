@@ -3,7 +3,7 @@ import re
 from pathlib import Path
 
 from agent.llm_client import get_model
-from utils.config import get_base_dir
+from utils.config import get_base_dir, get_api_key
 from utils.logger import log
 
 BASE_DIR = get_base_dir()
@@ -135,17 +135,19 @@ OUTPUT — return ONLY valid JSON, no markdown, no explanation, no code blocks:
 def create_plan(goal: str, context: str = "") -> dict:
     log.info(f"\n[Planner] Planning task: '{goal}'")
     try:
-        model = get_model(model_name="gemini-2.5-flash", system_instruction=PLANNER_PROMPT)
+        from google import genai
+        from google.genai import types as gtypes
+        client = genai.Client(api_key=get_api_key())
         
-        import google.generativeai as genai
-        config = genai.types.GenerationConfig(
+        config = gtypes.GenerateContentConfig(
             temperature=0.2,
             response_mime_type="application/json"
         )
         
-        response = model.generate_content(
-            goal,
-            generation_config=config
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=goal,
+            config=config
         )
         text = response.text.strip()
         log.debug(f"[Planner] Raw Response:\n{text}")
@@ -193,7 +195,6 @@ def _fallback_plan(goal: str) -> dict:
 
 
 def replan(goal: str, completed_steps: list, failed_step: dict, error: str) -> dict:
-    model = get_model(model_name="gemini-2.5-flash", system_instruction=PLANNER_PROMPT)
 
     completed_summary = "\n".join(
         f"  - Step {s['step']} ({s['tool']}): DONE" for s in completed_steps
@@ -210,12 +211,18 @@ Error: {error}
 Create a REVISED plan for the remaining work only. Do not repeat completed steps."""
 
     try:
-        import google.generativeai as genai
-        config = genai.types.GenerationConfig(
+        from google import genai
+        from google.genai import types as gtypes
+        client = genai.Client(api_key=get_api_key())
+        config = gtypes.GenerateContentConfig(
             temperature=0.2,
             response_mime_type="application/json"
         )
-        response = model.generate_content(prompt, generation_config=config)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=config
+        )
         text     = response.text.strip()
         text     = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
         plan     = json.loads(text)

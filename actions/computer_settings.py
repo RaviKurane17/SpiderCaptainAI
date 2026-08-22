@@ -83,9 +83,36 @@ def volume_set(value: int):
             vol.SetMasterVolumeLevelScalar(value / 100.0, None)
             return
         except Exception as e:
-            print(f"[Settings] pycaw failed, using keypress fallback: {e}")
-            pyautogui.press("volumemute")
-            pyautogui.press("volumemute")
+            print(f"[Settings] pycaw failed, using nircmd/PowerShell fallback: {e}")
+            # Fallback 1: nircmd (if installed)
+            import shutil
+            if shutil.which("nircmd"):
+                try:
+                    # nircmd uses 0-65535 range
+                    nircmd_val = int(value / 100.0 * 65535)
+                    subprocess.run(
+                        ["nircmd", "setsysvolume", str(nircmd_val)],
+                        capture_output=True, timeout=3
+                    )
+                    return
+                except Exception:
+                    pass
+            # Fallback 2: PowerShell with key simulation (approximate)
+            try:
+                # First unmute, then press volume keys to approximate the level
+                pyautogui.press("volumemute")
+                time.sleep(0.1)
+                pyautogui.press("volumemute")
+                time.sleep(0.1)
+                # Each volumeup key press is ~2% on Windows
+                steps = value // 2
+                for _ in range(50):
+                    pyautogui.press("volumedown")
+                for _ in range(steps):
+                    pyautogui.press("volumeup")
+                return
+            except Exception:
+                pass
     elif _OS == "Darwin":
         subprocess.run(["osascript", "-e", f"set volume output volume {value}"],
             capture_output=True)
@@ -692,7 +719,7 @@ def _detect_action(description: str) -> dict:
 
     import google.generativeai as genai
     genai.configure(api_key=get_api_key())
-    model = genai.GenerativeModel("gemini-2.5-flash-lite")
+    model = genai.GenerativeModel("gemini-3.5-flash-lite")
 
     available = ", ".join(sorted(ACTION_MAP.keys())) + \
                 ", volume_set, type_text, press_key, reload_n"

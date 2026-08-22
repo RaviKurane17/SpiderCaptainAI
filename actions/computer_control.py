@@ -11,7 +11,7 @@ from pathlib import Path
 
 try:
     import pyautogui
-    pyautogui.FAILSAFE = True
+    pyautogui.FAILSAFE = False
     pyautogui.PAUSE    = 0.05
     _PYAUTOGUI = True
 except ImportError:
@@ -143,10 +143,54 @@ def _user_profile() -> dict:
         pass
     return {}
 
+def _type_with_focus(text: str, interval: float = 0.03):
+    import pygetwindow as gw
+    import pyperclip
+    
+    # Save the user's existing clipboard so we can restore it after pasting
+    try:
+        original_clipboard = pyperclip.paste()
+    except Exception:
+        original_clipboard = None
+    
+    # Capture the target window at call time
+    active_win = gw.getActiveWindow()
+    expected_title = active_win.title if active_win else None
+    
+    # Small delay to let any pending window transitions settle
+    time.sleep(0.15)
+    
+    # Re-focus the target window if focus was lost between call and paste
+    if expected_title:
+        current_win = gw.getActiveWindow()
+        if not current_win or current_win.title != expected_title:
+            try:
+                for win in gw.getWindowsWithTitle(expected_title):
+                    win.activate()
+                    time.sleep(0.3)
+                    break
+            except Exception:
+                pass
+                
+    pyperclip.copy(text)
+    time.sleep(0.1)
+    pyautogui.hotkey("ctrl", "v")
+    time.sleep(0.15)
+    
+    # Restore the user's original clipboard contents
+    if original_clipboard is not None:
+        try:
+            pyperclip.copy(original_clipboard)
+        except Exception:
+            pass
+
 def _type(text: str, interval: float = 0.03) -> str:
     _require_pyautogui()
     time.sleep(0.3)
-    pyautogui.typewrite(text, interval=interval)
+    try:
+        _type_with_focus(text, interval)
+    except Exception:
+        pyautogui.typewrite(text, interval=interval)
     return f"Typed: {text[:60]}{'…' if len(text) > 60 else ''}"
 
 
@@ -159,10 +203,29 @@ def _smart_type(text: str, clear_first: bool = True) -> str:
     if len(text) > 20 and _PYPERCLIP:
         pyperclip.copy(text)
         time.sleep(0.1)
+        
+        try:
+            import pygetwindow as gw
+            active_win = gw.getActiveWindow()
+            expected_title = active_win.title if active_win else None
+            if expected_title:
+                current_win = gw.getActiveWindow()
+                if current_win and current_win.title != expected_title:
+                    for win in gw.getWindowsWithTitle(expected_title):
+                        win.activate()
+                        time.sleep(0.2)
+                        break
+        except Exception:
+            pass
+
         pyautogui.hotkey("ctrl", "v")
         return f"Smart-typed (clipboard): {text[:60]}{'…' if len(text) > 60 else ''}"
 
-    pyautogui.typewrite(text, interval=0.04)
+    try:
+        _type_with_focus(text, 0.04)
+    except Exception:
+        pyautogui.typewrite(text, interval=0.04)
+        
     return f"Smart-typed: {text[:60]}{'…' if len(text) > 60 else ''}"
 
 
@@ -322,7 +385,7 @@ def _screen_find(description: str) -> tuple[int, int] | None:
         )
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash-lite",
+            model="gemini-3.5-flash-lite",
             contents=[
                 gtypes.Part.from_bytes(data=image_bytes, mime_type="image/png"),
                 prompt,
@@ -464,6 +527,15 @@ def computer_control(
                 time.sleep(0.2)
                 _click(x=coords[0], y=coords[1])
                 return f"Clicked '{desc}' at {coords}"
+            return f"Element not found on screen: '{desc}'"
+
+        if action == "screen_double_click":
+            desc   = params.get("description", "")
+            coords = _screen_find(desc)
+            if coords:
+                time.sleep(0.2)
+                _click(x=coords[0], y=coords[1], clicks=2)
+                return f"Double-clicked '{desc}' at {coords}"
             return f"Element not found on screen: '{desc}'"
 
         if action == "wait":

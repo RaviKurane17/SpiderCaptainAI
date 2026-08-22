@@ -727,6 +727,9 @@ def _smart_open(params: dict, player=None, force_folder: bool = False, speak=Non
             target_path = cached_match["path"]
             engine.record_open(name, target_path)
             open_msg = ExplorerManager.open(target_path)
+            if open_msg.startswith("Error") or open_msg.startswith("Could not"):
+                if speak: speak(f"I tried to open it, but an error occurred.")
+                return open_msg
             if speak:
                 speak("I found it in the cache and opened it.")
             elif ui and hasattr(ui, "broadcast"):
@@ -754,18 +757,24 @@ def _smart_open(params: dict, player=None, force_folder: bool = False, speak=Non
         if result["status"] == "found" and result["count"] == 1:
             target_path = result["results"][0]["path"]
             open_msg = ExplorerManager.open(target_path)
-            if speak:
-                speak("I found it and opened it for you.")
-            elif ui and hasattr(ui, "broadcast"):
-                ui.broadcast({"type": "tts", "text": "I found it and opened it for you."})
-            if player:
-                player.write_log(f"[open] Auto-opened {result['results'][0]['name']}")
-                if ui and hasattr(ui, "broadcast"):
-                    ui.broadcast({
-                        "type": "chat_search_results",
-                        "query": name,
-                        "results": result.get("results", [])
-                    })
+            if open_msg.startswith("Error") or open_msg.startswith("Could not"):
+                if speak:
+                    speak("I tried to open it, but an error occurred.")
+                if player:
+                    player.write_log(f"[open] Failed: {open_msg}")
+            else:
+                if speak:
+                    speak("I found it and opened it for you.")
+                elif ui and hasattr(ui, "broadcast"):
+                    ui.broadcast({"type": "tts", "text": "I found it and opened it for you."})
+                if player:
+                    player.write_log(f"[open] Auto-opened {result['results'][0]['name']}")
+                    if ui and hasattr(ui, "broadcast"):
+                        ui.broadcast({
+                            "type": "chat_search_results",
+                            "query": name,
+                            "results": result.get("results", [])
+                        })
         elif result["status"] == "multiple":
             if speak:
                 speak(f"I found {len(result.get('results', []))} matches. I've sent them to your screen.")

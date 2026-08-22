@@ -324,11 +324,47 @@ def _write_action(description, language, output_path, player) -> str:
     if not description:
         return "Please describe what you want me to write, sir."
     if player:
-        player.write_log("[Code] Writing code...")
+        player.write_log("[Code] Generating code...")
     try:
-        code, path = _write(description, language, output_path, player)
-        print(f"[Code] ✅ Written: {path}")
+        lang  = language or "python"
+        model = _get_gemini()
+        prompt = f"""You are an expert {lang} developer.
+Write clean, working, well-commented {lang} code for the description below.
+
+Rules:
+- Output ONLY the code. No explanation, no markdown, no backticks.
+- Add helpful inline comments.
+- Handle errors and edge cases properly.
+- Use modern best practices.
+
+Description: {description}
+
+Code:"""
+        response = model.generate_content(prompt)
+        code     = _clean_code(response.text)
+        path     = _resolve_save_path(output_path, lang)
+        
+        _save_file(path, "")
+        print(f"[Code] 📝 Opening {path} in VS Code for automation...")
         _open_in_vscode(path)
+        
+        import time
+        time.sleep(2.0)
+        
+        try:
+            import pyperclip
+            import pyautogui
+            pyperclip.copy(code)
+            time.sleep(0.1)
+            pyautogui.hotkey("ctrl", "v")
+            time.sleep(0.5)
+            pyautogui.hotkey("ctrl", "s")
+            print(f"[Code] ✅ Code pasted and saved in VS Code.")
+        except Exception as paste_err:
+            print(f"[Code] ⚠️ Automation paste failed: {paste_err}. Saving directly.")
+            
+        _save_file(path, code)
+        
         return (
             f"Code written and saved to: {path}\n"
             f"The file has been opened in VS Code automatically.\n\n"

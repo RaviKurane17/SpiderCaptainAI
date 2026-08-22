@@ -90,10 +90,31 @@ class ExplorerManager:
 
         try:
             if cls._OS == "Windows":
-                # WHY: os.startfile is the most reliable way to open files
-                # on Windows — it delegates to ShellExecute internally,
-                # which handles all registered file associations.
-                os.startfile(str(target))
+                # WHY: ShellExecuteW returns an HINSTANCE. Values > 32 = success.
+                # Values <= 32 are error codes (e.g. 31 = no association).
+                # os.startfile() silently swallows association errors.
+                import ctypes
+                result = ctypes.windll.shell32.ShellExecuteW(
+                    None, "open", str(target), None, None, 1  # SW_SHOWNORMAL
+                )
+                if result <= 32:
+                    _SHELL_ERRORS = {
+                        0: "Out of memory",
+                        2: "File not found",
+                        3: "Path not found",
+                        5: "Access denied",
+                        11: "Bad format",
+                        26: "Sharing violation",
+                        27: "Incomplete file association",
+                        28: "DDE timeout",
+                        29: "DDE failed",
+                        30: "DDE busy",
+                        31: "No application associated with this file type",
+                        32: "DLL not found",
+                    }
+                    err_msg = _SHELL_ERRORS.get(result, f"Shell error code {result}")
+                    log.error(f"ShellExecuteW failed for {target}: {err_msg}")
+                    return f"Could not open {target.name}: {err_msg}"
             elif cls._OS == "Darwin":
                 subprocess.Popen(
                     ["open", str(target)],

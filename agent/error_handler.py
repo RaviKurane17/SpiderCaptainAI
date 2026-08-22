@@ -84,7 +84,7 @@ def analyze_error(
             "user_message":  "Trying a different approach, sir."
         }
 
-    model = get_model(model_name="gemini-2.5-flash-lite", system_instruction=ERROR_ANALYST_PROMPT)
+
 
     prompt = f"""Failed step:
 Tool: {step.get('tool')}
@@ -98,9 +98,19 @@ Error:
 Attempt number: {attempt}"""
 
     try:
-        import google.generativeai as genai
-        config = genai.types.GenerationConfig(response_mime_type="application/json")
-        response = model.generate_content(prompt, generation_config=config)
+        from google import genai
+        from google.genai import types as gtypes
+        from utils.config import get_api_key
+        client = genai.Client(api_key=get_api_key())
+        config = gtypes.GenerateContentConfig(
+            response_mime_type="application/json",
+            system_instruction=ERROR_ANALYST_PROMPT
+        )
+        response = client.models.generate_content(
+            model="gemini-3.5-flash-lite",
+            contents=prompt,
+            config=config
+        )
         text     = response.text.strip()
         text     = re.sub(r"```(?:json)?", "", text).strip().rstrip("`").strip()
 
@@ -178,9 +188,13 @@ Return ONLY the Python code, no explanation."""
         print(f"[ErrorHandler] ⚠️ Fix generation failed: {e}")
         return {
             "step":        step.get("step"),
-            "tool":        "generated_code",
+            "tool":        "code_helper",
             "description": f"Fallback for: {step.get('description')}",
-            "parameters":  {"description": step.get("description", "")},
+            "parameters":  {
+                "action": "run",
+                "description": step.get("description", ""),
+                "language": "python"
+            },
             "depends_on":  step.get("depends_on", []),
             "critical":    step.get("critical", False)
         }

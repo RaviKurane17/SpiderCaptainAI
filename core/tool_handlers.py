@@ -4,6 +4,7 @@ Imported by tool_dispatcher.execute_tool_inner().
 """
 import asyncio
 import traceback
+import threading
 
 from utils.logger import log
 from utils.concurrency import run_in_background
@@ -32,14 +33,43 @@ async def _run_sync(loop, fn, pool=None):
 
 
 async def _background_tool(name, fn, speak_cb, pool=None):
-    """Fire a function in a background thread and return an immediate ack."""
+    """Fire a function in a background thread, register in TaskRegistry, and return an immediate ack."""
+    import uuid
+    task_id = uuid.uuid4().hex[:8]
+    cancel_event = threading.Event()
+
     def _run():
+        from core.task_registry import get_registry
+        registry = get_registry()
+        registry.register(task_id, name, cancel_event.set)
+
+        # Heartbeat: remind user every 15s that we're still working
+        heartbeat_stop = threading.Event()
+        def _heartbeat():
+            count = 0
+            while not heartbeat_stop.wait(15.0):
+                count += 1
+                if cancel_event.is_set():
+                    break
+                if speak_cb:
+                    speak_cb(f"Still working on {name}, boss...")
+        import threading as _t
+        hb = _t.Thread(target=_heartbeat, daemon=True)
+        hb.start()
+
         try:
+            if cancel_event.is_set():
+                if speak_cb:
+                    speak_cb(f"{name} was cancelled.")
+                return
             res = fn()
-            if res:
+            if not cancel_event.is_set() and res:
                 speak_cb(f"[System: {name} finished] {res}")
         except Exception as exc:
             log.error(f"[{name}] background error: {exc}")
+        finally:
+            heartbeat_stop.set()
+            registry.deregister(task_id)
     
     from utils.concurrency import get_fast_pool
     pool = pool or get_fast_pool()
@@ -173,6 +203,12 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
             r = await _run_sync(loop, lambda: computer_use_action(parameters=args, player=ui), pool=io_pool)
             result = r or "Done."
 
+        elif name == "browser_control":
+            from actions.browser_agent import browser_agent
+            # Running in io_pool; browser_agent has its own background thread for the event loop
+            r = await _run_sync(loop, lambda: browser_agent(parameters=args, player=ui), pool=io_pool)
+            result = r or "Done."
+
         elif name == "shutdown_captain":
             from utils import analytics as _analytics
             ui.write_log("SYS: Shutdown requested.")
@@ -197,6 +233,27 @@ async def dispatch_action(name: str, args: dict, ui, speak_callback, speak_error
                 return resp
             r = await _run_sync(loop, _do_search, pool=io_pool)
             result = r or "Done."
+
+        elif name == "cancel_task":
+            from core.task_registry import get_registry
+            registry = get_registry()
+            count = registry.cancel_all()
+            # Also cancel file search/indexing specifically
+            try:
+                from actions.files.engine import get_engine
+                get_engine().cancel_search()
+                get_engine().cancel_indexing()
+            except Exception:
+                pass
+            # Also cancel any queued agent tasks
+            try:
+                from agent.task_queue import get_queue
+                for status in get_queue().get_all_statuses():
+                    if status["status"] in ("pending", "running"):
+                        get_queue().cancel(status["task_id"])
+            except Exception:
+                pass
+            result = f"Cancelled {count} background tasks." if count else "All background tasks have been cancelled."
 
         else:
             # Plugin handlers registered at load time

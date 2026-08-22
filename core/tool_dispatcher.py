@@ -80,19 +80,23 @@ TOOL_DECLARATIONS = [
     {
         "name": "youtube_video",
         "description": (
-            "Controls YouTube. Use for: playing videos, summarizing a video's content, "
-            "getting video info, or showing trending videos."
+            "Controls YouTube: play, pause, unpause, skip, seek, next, previous track, "
+            "summarize a video, get info, or show trending. "
+            "Use seek_forward/seek_backward for time-skipping (e.g. 'skip 20 seconds'). "
+            "IMPORTANT: If the user says 'next 20 seconds', only use seek_forward. Do NOT use the 'next' action (which skips to the next video entirely)."
+            "For media controls, ALWAYS use this tool — never use keyboard shortcuts."
         ),
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action": {"type": "STRING", "description": "play | summarize | get_info | trending (default: play)"},
+                "action": {"type": "STRING", "description": "play | pause | unpause | play_pause | next | previous | seek_forward | seek_backward | summarize | get_info | trending"},
                 "query":  {"type": "STRING", "description": "Search query for play action"},
+                "seconds":{"type": "INTEGER", "description": "Number of seconds for seek_forward/seek_backward (default: 20)"},
                 "save":   {"type": "BOOLEAN", "description": "Save summary to Notepad (summarize only)"},
                 "region": {"type": "STRING", "description": "Country code for trending e.g. TR, US"},
                 "url":    {"type": "STRING", "description": "Video URL for get_info action"},
             },
-            "required": []
+            "required": ["action"]
         }
     },
     {
@@ -233,11 +237,11 @@ TOOL_DECLARATIONS = [
     },
     {
         "name": "computer_control",
-        "description": "Direct computer control: type, click, hotkeys, scroll, move mouse, screenshots, find elements on screen.",
+        "description": "Direct computer control: real-time typing, clicking, double clicking, right clicking, hotkeys (ctrl+c/v/z, win+r, alt+tab, etc.), scrolling, mouse moves, screenshots, and finding/clicking UI elements on screen by visual description.",
         "parameters": {
             "type": "OBJECT",
             "properties": {
-                "action":      {"type": "STRING", "description": "type | smart_type | click | double_click | right_click | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | screen_find | screen_click | random_data | user_data"},
+                "action":      {"type": "STRING", "description": "type | smart_type | click | double_click | right_click | hotkey | press | scroll | move | copy | paste | screenshot | wait | clear_field | focus_window | screen_find | screen_click | screen_double_click | random_data | user_data"},
                 "text":        {"type": "STRING", "description": "Text to type or paste"},
                 "x":           {"type": "INTEGER", "description": "X coordinate"},
                 "y":           {"type": "INTEGER", "description": "Y coordinate"},
@@ -260,8 +264,9 @@ TOOL_DECLARATIONS = [
         "name": "shutdown_captain",
         "description": (
             "Shuts down the assistant completely. "
-            "Call this when the user expresses intent to end the conversation, "
-            "close the assistant, say goodbye, or stop Captain. "
+            "IMPORTANT: When the user asks you to shut down, go to sleep, or say goodbye, you MUST NOT call this tool immediately! "
+            "Instead, you must first ask the user 'Are you sure, boss?' (or similar) and wait for them to reply. "
+            "ONLY call this tool if the user explicitly confirms 'yes' after you ask them. "
             "The user can say this in ANY language."
         ),
         "parameters": {
@@ -414,6 +419,31 @@ TOOL_DECLARATIONS = [
             },
             "required": ["action"]
         }
+    },
+    {
+        "name": "browser_control",
+        "description": (
+            "Controls the Playwright AI browser to autonomously browse the web, fill forms, click buttons, "
+            "extract page content, and interact with websites — all without moving the user's mouse. "
+            "Use this for: opening a URL, clicking any element by CSS selector or text, filling input fields, "
+            "submitting forms, searching on Google/YouTube/any site, reading page content, taking browser screenshots. "
+            "This is the BEST tool for any web interaction task where you need to act like a real user on a website. "
+            "Examples: 'open gmail and compose email', 'search Google for best laptops', 'fill the login form', "
+            "'go to youtube.com and search for jazz music'. "
+            "IMPORTANT: Always call navigate first to open a URL, then use click/fill/submit to interact."
+        ),
+        "parameters": {
+            "type": "OBJECT",
+            "properties": {
+                "action": {"type": "STRING", "description": "navigate | click | fill | submit | extract_text | find_and_click | search | screenshot | get_url | scroll_to | scroll_down | scroll_up | wait_for | close"},
+                "url":      {"type": "STRING", "description": "Full URL to navigate to (e.g. 'https://google.com')"},
+                "selector": {"type": "STRING", "description": "CSS selector or element text for click/fill (e.g. 'input[name=q]', 'button[type=submit]', '.search-box')"},
+                "text":     {"type": "STRING", "description": "Text to type into a field, or text to search for"},
+                "query":    {"type": "STRING", "description": "Search query — automatically finds the search box and types this"},
+                "site":     {"type": "STRING", "description": "Site name for search: google | youtube | bing | amazon | github"},
+            },
+            "required": ["action"]
+        }
     }
 ]
 
@@ -437,10 +467,36 @@ def load_plugins():
     except Exception as e:
         log.warning(f"[Plugins] Failed to load: {e}")
 
+TOOL_DECLARATIONS.append({
+    "name": "ignore_background_noise",
+    "description": (
+        "CRITICAL: Call this tool IMMEDIATELY if you hear speech that does NOT start with 'Captain' or is clearly background conversation not addressed to you. "
+        "By calling this tool, you remain completely silent and do not interrupt the user's real-life conversation, but you still keep the context in your memory. "
+        "You MUST NOT speak any audio or text when calling this tool."
+    ),
+    "parameters": {
+        "type": "OBJECT",
+        "properties": {
+            "reason": {"type": "STRING", "description": "Short reason, e.g. 'background noise' or 'user talking to someone else'"}
+        },
+        "required": ["reason"]
+    }
+})
 
 async def execute_tool(fc, ui, speak_callback, speak_error_callback, perf_state) -> 'types.FunctionResponse':
     name = fc.name
     args = dict(fc.args or {})
+
+    if name in ("computer_control", "youtube_video", "open_app", "browser_control"):
+        # Only block if AI explicitly signals background noise (requires_captain=False).
+        # If parameter is missing/None (normal commands), allow through as safe default.
+        if args.get("requires_captain") is False:
+            log.warning(f"[CAPTAIN] 🚫 Aborting tool {name}: Wake Word missing (Background Noise).")
+            from google.genai import types
+            return types.FunctionResponse(
+                id=fc.id, name=name,
+                response={"result": "Action aborted. The user did not say 'Captain'. Ignore and say nothing."}
+            )
 
     perf_state['tool_start'] = _time.perf_counter()
     perf_state['tool_active'] = True
@@ -470,6 +526,13 @@ async def execute_tool_inner(fc, name, args, ui, speak_callback, speak_error_cal
     from google.genai import types
     if name == "save_memory":
         return await _do_save_memory(fc, args)
+        
+    if name == "ignore_background_noise":
+        log.info(f"[CAPTAIN] 🤫 Ignoring background noise: {args.get('reason', 'N/A')}")
+        return types.FunctionResponse(
+            id=fc.id, name=name,
+            response={"result": "ok", "silent": True}
+        )
 
     from core.tool_handlers import dispatch_action
     try:
@@ -515,3 +578,12 @@ async def _do_save_memory(fc, args):
         id=fc.id, name=fc.name,
         response={"result": "ok", "silent": True}
     )
+
+# Add requires_captain parameter dynamically to prevent background noise execution
+_REQUIRES_CAPTAIN_PARAM = {
+    "type": "BOOLEAN",
+    "description": "CRITICAL: Set to True ONLY if the user explicitly said 'Captain' in the voice command. Set to False if this is background noise."
+}
+for _tool in TOOL_DECLARATIONS:
+    if _tool.get("name") in ("computer_control", "youtube_video", "open_app", "browser_control"):
+        _tool.setdefault("parameters", {}).setdefault("properties", {})["requires_captain"] = _REQUIRES_CAPTAIN_PARAM
